@@ -14,6 +14,12 @@ class Settings(BaseSettings):
     APP_VERSION: str = "1.0.0"
     DEBUG: bool = True
 
+    # CORS
+    CORS_ORIGINS: list[str] = [
+        "http://localhost:3000",
+        "https://brain-study.vercel.app",
+    ]
+
     # Database
     DATABASE_URL: str
 
