@@ -1,0 +1,63 @@
+# ============================================
+# Brain Study Backend
+# ============================================
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Virtual Environment
+.venv/
+venv/
+env/
+
+# Environment Variables
+.env
+
+# IDE
+.vscode/
+.idea/
+
+# macOS
+.DS_Store
+
+# Logs
+*.log
+logs/
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Ruff
+.ruff_cache/
+
+# MyPy
+.mypy_cache/
+
+# Pyright
+.pyright/
+
+# Build
+build/
+dist/
+*.egg-info/
+
+# Alembic
+alembic/versions/*.pyc
+
+# Uploaded Files
+uploads/
+
+# SQLite
+*.db
+*.sqlite3
+
+# Temporary Files
+*.tmp
+*.bak
+
+# OS
+Thumbs.db
