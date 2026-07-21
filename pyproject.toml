@@ -2,12 +2,14 @@
 requires = ["setuptools>=75.0", "wheel"]
 build-backend = "setuptools.build_meta"
 
+
 [project]
 name = "brain-study-backend"
 version = "1.0.0"
 description = "Production-ready backend for Brain Study"
 readme = "README.md"
 requires-python = ">=3.13"
+
 authors = [
     { name = "Brain Study Team" }
 ]
@@ -15,21 +17,30 @@ authors = [
 dependencies = [
     "fastapi>=0.116.1",
     "uvicorn[standard]>=0.35.0",
+
     "sqlalchemy>=2.0.42",
     "alembic>=1.16.4",
-    "psycopg[binary]>=3.2.9",
+
+    "psycopg2-binary>=2.9.9",
+
     "pydantic>=2.11.7",
     "pydantic-settings>=2.10.1",
+
     "python-jose[cryptography]>=3.5.0",
     "pwdlib[argon2]>=0.2.1",
+
     "python-multipart>=0.0.20",
     "email-validator>=2.2.0",
+
     "python-dotenv>=1.1.1",
+
     "httpx>=0.28.1",
+
     "structlog>=25.4.0",
     "orjson>=3.11.1",
     "loguru>=0.7.3"
 ]
+
 
 [project.optional-dependencies]
 dev = [
@@ -40,16 +51,20 @@ dev = [
     "pytest-cov>=6.2.1"
 ]
 
+
 [tool.setuptools]
 packages = ["app"]
+
 
 [tool.black]
 line-length = 88
 target-version = ["py313"]
 
+
 [tool.ruff]
 line-length = 88
 target-version = "py313"
+
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
