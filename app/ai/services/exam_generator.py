@@ -25,7 +25,7 @@ class ExamGenerator:
         *,
         study_material,
         user,
-        settings,
+        exam_settings,
     ):
 
         material = study_material.extracted_text
@@ -34,12 +34,12 @@ class ExamGenerator:
             material,
         )
 
-        if settings.question_type == "objective":
+        if exam_settings.question_type == "objective":
 
             return await self.generate_objective_exam(
                 material=material,
                 analysis=analysis,
-                settings=settings,
+                exam_settings=exam_settings,
                 user=user,
                 study_material=study_material,
             )
@@ -47,7 +47,7 @@ class ExamGenerator:
         return await self.generate_theory_exam(
             material=material,
             analysis=analysis,
-            settings=settings,
+            exam_settings=exam_settings,
             user=user,
             study_material=study_material,
         )
@@ -156,7 +156,7 @@ Needs Diagram
 
 RULES
 
-Generate exactly {settings.total_questions} questions.
+Generate exactly {exam_settings.total_questions} questions.
 
 Every question must have
 
@@ -259,7 +259,7 @@ Study Material
 
         return self.build_objective_exam(
             questions=questions,
-            settings=settings,
+            exam_settings=exam_settings,
             user=user,
             study_material=study_material,
         )
@@ -270,12 +270,12 @@ Study Material
         *,
         material: str,
         analysis: dict,
-        settings,
+        exam_settings,
         user,
         study_material,
     ):
 
-        total_questions = settings.total_questions
+        total_questions = exam_settings.total_questions
 
         if total_questions <= 5:
             questions_to_generate = total_questions + 2
@@ -452,7 +452,7 @@ Study Material
         return self.build_theory_exam(
             questions=data["questions"],
             instruction=data["instruction"],
-            settings=settings,
+            exam_settings=exam_settings,
             user=user,
             study_material=study_material,
         )
