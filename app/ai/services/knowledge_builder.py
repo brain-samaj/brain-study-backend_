@@ -1,77 +1,68 @@
 from __future__ import annotations
 
-import json
-
-from app.ai.client import AIClient
+from app.ai.services.document_processor import DocumentProcessor
+from app.ai.services.study_guide_generator import StudyGuideGenerator
+from app.ai.services.flashcard_generator import FlashcardGenerator
+from app.ai.services.exam_generator import ExamGenerator
+from app.modules.knowledge_engine.models import KnowledgeSource
+from app.modules.knowledge_engine.repository import KnowledgeRepository
 
 
 class KnowledgeBuilder:
+    """
+    Complete AI pipeline.
 
-    def __init__(self):
-        self.ai = AIClient()
+    Upload
+        ↓
+    Extract Text
+        ↓
+    Clean Text
+        ↓
+    Study Guide
+        ↓
+    Flashcards
+        ↓
+    Exams
+    """
 
+    def __init__(
+        self,
+        repository: KnowledgeRepository,
+    ):
+        self.repository = repository
+
+        self.processor = DocumentProcessor(
+            repository,
+        )
+
+        self.study_guide = StudyGuideGenerator()
+
+        self.flashcards = FlashcardGenerator()
+
+        self.exam = ExamGenerator()
 
     async def build(
         self,
-        *,
-        subject: str,
-        title: str,
-        material: str,
-    ) -> dict:
+        source: KnowledgeSource,
+    ) -> None:
 
-        prompt = f"""
-You are an expert educational knowledge engineer.
+        source = await self.processor.process(
+            source,
+        )
 
-Convert this learning material into structured knowledge.
+        if not source.cleaned_text:
+            raise ValueError(
+                "No extracted text."
+            )
 
-Subject
+        await self.study_guide.generate(
+            source=source,
+        )
 
-{subject}
+        await self.flashcards.generate(
+            source=source,
+        )
 
-Title
-
-{title}
-
-Material
-
-{material}
-
-Extract ONLY information contained in the material.
-
-Return JSON with the following structure.
-
-{{
-  "subject":"",
-  "title":"",
-  "difficulty":"",
-  "topics":[],
-  "subtopics":[],
-  "definitions":[],
-  "principles":[],
-  "laws":[],
-  "formulas":[],
-  "equations":[],
-  "symbols":[],
-  "constants":[],
-  "processes":[],
-  "algorithms":[],
-  "proofs":[],
-  "worked_examples":[],
-  "examples":[],
-  "applications":[],
-  "advantages":[],
-  "disadvantages":[],
-  "comparisons":[],
-  "mnemonics":[],
-  "common_mistakes":[],
-  "exam_tips":[],
-  "keywords":[]
-}}
-
-Return ONLY JSON.
-"""
-
-        response = await self.ai.generate_json(prompt)
-
-        return json.loads(response)
-
+        await self.exam.generate(
+            source=source,
+        )

@@ -1,86 +1,83 @@
 from __future__ import annotations
 
-from app.ai.services.study_guide_generator import StudyGuideGenerator
-from app.ai.services.flashcard_generator import FlashcardGenerator
-from app.ai.services.smart_study import SmartStudyEngine
-from app.ai.services.exam_generator import ExamGenerator
+import logging
+
+from app.ai.services.knowledge_builder import KnowledgeBuilder
+from app.modules.knowledge_engine.repository import KnowledgeRepository
+
+logger = logging.getLogger(__name__)
 
 
 class AIOrchestrator:
+    """
+    Coordinates the complete AI pipeline.
 
-    def __init__(self):
+    Upload
+      ↓
+    OCR / Text Extraction
+      ↓
+    Cleaning
+      ↓
+    Embeddings
+      ↓
+    Knowledge Base
+      ↓
+    Study Guide
+      ↓
+    Flashcards
+      ↓
+    Smart Study
+      ↓
+    Objective Exam
+      ↓
+    Theory Exam
+    """
 
-        self.study_guide = StudyGuideGenerator()
-
-        self.flashcards = FlashcardGenerator()
-
-        self.smart_study = SmartStudyEngine()
-
-        self.exam = ExamGenerator()
-
-
-    async def build_learning_pack(
+    def __init__(
         self,
-        *,
-        subject: str,
-        title: str,
-        material: str,
-        education_level: str,
+        repository: KnowledgeRepository,
+    ):
+        self.repository = repository
+
+    async def process_source(
+        self,
+        source_id,
     ):
 
-        guide = await self.study_guide.generate(
-            subject=subject,
-            title=title,
-            material=material,
-            education_level=education_level,
+        source = self.repository.get(
+            source_id,
         )
 
-        flashcards = await self.flashcards.generate(
-            subject=subject,
-            study_material=material,
-            study_guide=str(guide),
+        if source is None:
+            raise ValueError(
+                "Knowledge source not found."
+            )
+
+        builder = KnowledgeBuilder(
+            self.repository,
         )
 
-        return {
-            "study_guide": guide,
-            "flashcards": flashcards,
-        }
+        try:
 
+            await builder.build(
+                source,
+            )
 
-    async def generate_exam(
-        self,
-        *,
-        subject: str,
-        study_material: str,
-        study_guide: str,
-        question_type: str,
-        questions: int,
-    ):
+            logger.info(
+                "Knowledge pipeline completed for %s",
+                source.id,
+            )
 
-        return await self.exam.generate_exam(
-            subject=subject,
-            study_material=study_material,
-            study_guide=study_guide,
-            question_type=question_type,
-            requested_questions=questions,
-        )
+            return source
 
+        except Exception as exc:
 
-    async def next_smart_study_question(
-        self,
-        *,
-        subject: str,
-        study_material: str,
-        study_guide: str,
-        previous_questions: list,
-        previous_answers: list,
-    ):
+            logger.exception(exc)
 
-        return await self.smart_study.next_question(
-            subject=subject,
-            study_material=study_material,
-            study_guide=study_guide,
-            previous_questions=previous_questions,
-            previous_answers=previous_answers,
-        )
+            self.repository.update_processing(
+                source,
+                status="failed",
+                error_message=str(exc),
+            )
 
+            raise

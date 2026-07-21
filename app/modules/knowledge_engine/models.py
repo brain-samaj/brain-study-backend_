@@ -10,59 +10,39 @@ from sqlalchemy import Index
 from sqlalchemy import Integer
 from sqlalchemy import String
 from sqlalchemy import Text
-
 from sqlalchemy.orm import Mapped
 from sqlalchemy.orm import mapped_column
-from sqlalchemy.orm import relationship
 
 from app.database.base import BaseModel
 
 
 class KnowledgeSource(BaseModel):
-    """
-    Unified learning input.
-
-    This can represent:
-
-    - PDF
-    - DOCX
-    - PPTX
-    - TXT
-    - Handwritten image
-    - Printed image
-    - Topic description
-    - Pasted text
-    """
-
     __tablename__ = "knowledge_sources"
 
     __table_args__ = (
         Index("ix_knowledge_user_id", "user_id"),
         Index("ix_knowledge_source_type", "source_type"),
+        Index("ix_knowledge_subject", "subject"),
         Index("ix_knowledge_status", "processing_status"),
     )
-
-    # owner
 
     user_id: Mapped[UUID] = mapped_column(
         ForeignKey("users.id", ondelete="CASCADE"),
         nullable=False,
     )
 
-    # source information
-
     source_type: Mapped[str] = mapped_column(
         String(50),
         nullable=False,
     )
 
-    # pdf
-    # image
-    # text
-    # topic
-
     title: Mapped[str] = mapped_column(
         String(255),
+        nullable=False,
+    )
+
+    subject: Mapped[str] = mapped_column(
+        String(120),
         nullable=False,
     )
 
@@ -70,8 +50,6 @@ class KnowledgeSource(BaseModel):
         Text,
         nullable=True,
     )
-
-    # storage
 
     file_name: Mapped[str | None] = mapped_column(
         String(500),
@@ -93,8 +71,6 @@ class KnowledgeSource(BaseModel):
         nullable=True,
     )
 
-    # extracted text
-
     raw_text: Mapped[str | None] = mapped_column(
         Text,
         nullable=True,
@@ -105,16 +81,12 @@ class KnowledgeSource(BaseModel):
         nullable=True,
     )
 
-    # OCR
-
     ocr_completed: Mapped[bool] = mapped_column(
         Boolean,
         default=False,
         server_default="false",
         nullable=False,
     )
-
-    # processing
 
     processing_status: Mapped[str] = mapped_column(
         String(50),
@@ -137,7 +109,8 @@ class KnowledgeSource(BaseModel):
         return (
             f"<KnowledgeSource("
             f"id={self.id}, "
-            f"type={self.source_type}, "
-            f"title='{self.title}'"
+            f"title='{self.title}', "
+            f"subject='{self.subject}', "
+            f"type='{self.source_type}'"
             f")>"
         )

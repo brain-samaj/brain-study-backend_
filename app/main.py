@@ -1,50 +1,50 @@
 from __future__ import annotations
 
-from contextlib import asynccontextmanager
-
 from fastapi import FastAPI
-from fastapi.middleware.cors import CORSMiddleware
 
-from app.api.v1 import api_router
-from app.core.config import settings
-
-
-@asynccontextmanager
-async def lifespan(app: FastAPI):
-    print(f"Starting {settings.APP_NAME}...")
-    yield
-    print(f"Stopping {settings.APP_NAME}...")
-
+from app.modules.auth.router import router as auth_router
+from app.modules.exams.router import router as exams_router
+from app.modules.knowledge_engine.router import router as knowledge_router
+from app.modules.study_guide.router import router as study_guide_router
 
 app = FastAPI(
-    title=settings.APP_NAME,
-    version=settings.APP_VERSION,
-    debug=settings.DEBUG,
-    lifespan=lifespan,
+    title="Brain Study API",
+    version="1.0.0",
 )
 
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=settings.CORS_ORIGINS,
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+API_PREFIX = "/api/v1"
+
+app.include_router(
+    auth_router,
+    prefix=API_PREFIX,
 )
 
-app.include_router(api_router)
+app.include_router(
+    knowledge_router,
+    prefix=API_PREFIX,
+)
+
+app.include_router(
+    study_guide_router,
+    prefix=API_PREFIX,
+)
+
+app.include_router(
+    exams_router,
+    prefix=API_PREFIX,
+)
 
 
-@app.get("/", tags=["Root"])
-async def root() -> dict:
+@app.get("/")
+def root():
     return {
-        "application": settings.APP_NAME,
-        "version": settings.APP_VERSION,
+        "application": "Brain Study",
         "status": "running",
     }
 
 
-@app.get("/health", tags=["Health"])
-async def health() -> dict:
+@app.get("/health")
+def health():
     return {
         "status": "healthy",
     }

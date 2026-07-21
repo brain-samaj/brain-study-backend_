@@ -2,111 +2,53 @@ from __future__ import annotations
 
 from pathlib import Path
 
-import fitz
-import docx
-from pptx import Presentation
-from PIL import Image
-import pytesseract
+from app.ai.extractors.factory import ExtractorFactory
+from app.ai.retrieval.cleaner import TextCleaner
+from app.modules.knowledge_engine.models import KnowledgeSource
+from app.modules.knowledge_engine.repository import KnowledgeRepository
 
 
 class DocumentProcessor:
 
-    async def extract_text(
+    def __init__(
         self,
-        path: str,
-    ) -> str:
-
-        suffix = Path(path).suffix.lower()
-
-        if suffix == ".pdf":
-            return self._pdf(path)
-
-        if suffix == ".docx":
-            return self._docx(path)
-
-        if suffix == ".pptx":
-            return self._pptx(path)
-
-        if suffix == ".txt":
-            return self._txt(path)
-
-        if suffix in [
-            ".jpg",
-            ".jpeg",
-            ".png",
-            ".webp",
-        ]:
-            return self._image(path)
-
-        raise ValueError("Unsupported file")
-
-
-    def _pdf(
-        self,
-        path,
+        repository: KnowledgeRepository,
     ):
+        self.repository = repository
 
-        document = fitz.open(path)
-
-        text = []
-
-        for page in document:
-            text.append(page.get_text())
-
-        return "\n".join(text)
-
-
-    def _docx(
+    async def process(
         self,
-        path,
-    ):
+        source: KnowledgeSource,
+    ) -> KnowledgeSource:
 
-        document = docx.Document(path)
+        if not source.file_path:
+            raise ValueError("Document has no file path.")
 
-        return "\n".join(
-            p.text
-            for p in document.paragraphs
+        extractor = ExtractorFactory.create(
+            Path(source.file_path),
         )
 
+        raw_text = extractor.extract()
 
-    def _pptx(
+        cleaned_text = TextCleaner.clean(
+            raw_text,
+        )
+
+        return self.repository.update_processing(
+            source,
+            status="completed",
+            raw_text=raw_text,
+            cleaned_text=cleaned_text,
+        )
+
+    async def fail(
         self,
-        path,
-    ):
+        source: KnowledgeSource,
+        error: Exception,
+    ) -> KnowledgeSource:
 
-        prs = Presentation(path)
-
-        lines = []
-
-        for slide in prs.slides:
-
-            for shape in slide.shapes:
-
-                if hasattr(shape, "text"):
-                    lines.append(shape.text)
-
-        return "\n".join(lines)
-
-
-    def _txt(
-        self,
-        path,
-    ):
-
-        with open(
-            path,
-            encoding="utf-8",
-        ) as file:
-
-            return file.read()
-
-
-    def _image(
-        self,
-        path,
-    ):
-
-        image = Image.open(path)
-
-        return pytesseract.image_to_string(image)
-
+        return self.repository.update_processing(
+            source,
+            status="failed",
+            error_message=str(error),
+        )

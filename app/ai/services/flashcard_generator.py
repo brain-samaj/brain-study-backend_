@@ -1,93 +1,29 @@
 from __future__ import annotations
 
-import json
-
 from app.ai.client import AIClient
+from app.ai.prompts.flashcards import FLASHCARD_PROMPT
+from app.modules.knowledge_engine.models import KnowledgeSource
 
 
 class FlashcardGenerator:
 
     def __init__(self):
-        self.ai = AIClient()
-
+        self.client = AIClient()
 
     async def generate(
         self,
         *,
-        subject: str,
-        study_material: str,
-        study_guide: str,
-    ) -> dict:
+        source: KnowledgeSource,
+    ):
 
-        prompt = f"""
-You are an expert university tutor.
+        prompt = FLASHCARD_PROMPT.format(
+            title=source.title,
+            subject=source.subject,
+            content=source.cleaned_text,
+        )
 
-Subject
+        response = await self.client.generate_json(
+            prompt,
+        )
 
-{subject}
-
-Study Material
-
-{study_material}
-
-Study Guide
-
-{study_guide}
-
-Generate intelligent flashcards.
-
-Rules
-
-Do NOT copy sentences directly.
-
-Every flashcard must teach one important idea.
-
-Mix different flashcard styles.
-
-Types
-
-Definition
-
-Concept
-
-Formula
-
-Worked Example
-
-Comparison
-
-Cause and Effect
-
-Advantages vs Disadvantages
-
-Step-by-step Process
-
-Memory Trick
-
-Common Mistake
-
-Application
-
-Return JSON.
-
-Each flashcard should contain
-
-type
-
-front
-
-back
-
-difficulty
-
-topic
-
-importance
-
-Return ONLY JSON.
-"""
-
-        response = await self.ai.generate_json(prompt)
-
-        return json.loads(response)
-
+        return response
