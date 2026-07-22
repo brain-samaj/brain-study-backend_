@@ -1,5 +1,5 @@
-from app.ai.orchestrator import AIOrchestrator
+from app.ai.orchestrator import KnowledgeOrchestrator
 
 __all__ = [
-    "AIOrchestrator",
+    "KnowledgeOrchestrator",
 ]

@@ -60,3 +60,24 @@ Material
 
 {content}
 """
+
+
+def build_theory_exam_prompt(
+    *,
+    analysis,
+    material: str,
+    duration: int = 120,
+    answer_any: int = 5,
+) -> str:
+    """
+    Backward compatibility wrapper.
+    Existing services use this function name.
+    """
+
+    return TheoryExamPromptBuilder.build(
+        subject=analysis.subject,
+        topic=analysis.topic,
+        duration=duration,
+        answer_any=answer_any,
+        content=material,
+    )

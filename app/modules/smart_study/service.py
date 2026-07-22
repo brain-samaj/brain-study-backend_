@@ -4,7 +4,7 @@ from uuid import UUID
 
 from sqlalchemy.orm import Session
 
-from app.ai.services.smart_study import SmartStudyEngine
+from app.ai.services.smart_study import SmartStudyAIService
 from app.modules.smart_study.repository import SmartStudyRepository
 
 

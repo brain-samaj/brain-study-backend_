@@ -31,3 +31,8 @@ class SmartStudyAIService:
         response = await self.client.generate_json(prompt)
 
         return response
+
+
+# Backward compatibility alias
+# Existing application services use SmartStudyEngine.
+SmartStudyEngine = SmartStudyAIService

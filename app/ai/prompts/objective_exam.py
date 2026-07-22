@@ -62,3 +62,24 @@ Material
 
 {content}
 """
+
+
+def build_objective_prompt(
+    *,
+    analysis,
+    material: str,
+    total_questions: int,
+    difficulty: str = "mixed",
+) -> str:
+    """
+    Backward compatible wrapper.
+    Existing services can use this while the new builder remains the source of truth.
+    """
+
+    return ObjectiveExamPromptBuilder.build(
+        subject=analysis.subject,
+        topic=analysis.topic,
+        difficulty=difficulty,
+        question_count=total_questions,
+        content=material,
+    )
