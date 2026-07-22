@@ -5,158 +5,101 @@ from dataclasses import dataclass
 
 
 @dataclass(slots=True)
-class TextChunk:
-    """
-    Represents one semantic chunk of a study material.
-    """
+class DocumentChunk:
 
-    index: int
+    id: int
+
     text: str
-    word_count: int
-    start_word: int
-    end_word: int
+
+    words: int
+
+    characters: int
 
 
 class SemanticChunker:
     """
-    Production semantic chunker.
+    Splits cleaned documents into
+    overlapping semantic chunks.
 
-    Goals
+    Optimized for:
 
-    • Preserve paragraphs
-    • Preserve headings
-    • Avoid splitting equations
-    • Keep related explanations together
-    • Produce embedding-friendly chunks
+    • Study Guide
+    • Smart Study
+    • Flashcards
+    • Practice Exam
     """
 
     def __init__(
         self,
         *,
         chunk_size: int = 700,
-        overlap: int = 100,
+        overlap: int = 120,
     ):
 
         self.chunk_size = chunk_size
         self.overlap = overlap
 
-    ############################################################
-    # PARAGRAPH SPLITTING
-    ############################################################
-
-    def paragraphs(
-        self,
-        text: str,
-    ) -> list[str]:
-
-        paragraphs = re.split(
-            r"\n\s*\n",
-            text,
-        )
-
-        return [
-            p.strip()
-            for p in paragraphs
-            if p.strip()
-        ]
-
-    ############################################################
-    # WORD COUNT
-    ############################################################
-
-    def words(
-        self,
-        text: str,
-    ) -> int:
-
-        return len(
-            text.split(),
-        )
-
-    ############################################################
-    # BUILD CHUNKS
-    ############################################################
-
     def chunk(
         self,
         text: str,
-    ) -> list[TextChunk]:
+    ) -> list[DocumentChunk]:
 
-        paragraphs = self.paragraphs(
-            text,
-        )
+        paragraphs = [
+            p.strip()
+            for p in re.split(r"\n{2,}", text)
+            if p.strip()
+        ]
 
-        chunks: list[TextChunk] = []
+        chunks: list[DocumentChunk] = []
 
-        current: list[str] = []
-
-        current_words = 0
-
-        start_word = 0
-
-        chunk_index = 1
+        current = ""
+        chunk_id = 1
 
         for paragraph in paragraphs:
 
-            paragraph_words = self.words(
-                paragraph,
-            )
+            if len(current) + len(paragraph) < self.chunk_size:
 
-            if (
-                current
-                and current_words + paragraph_words > self.chunk_size
-            ):
+                current += "\n\n" + paragraph
 
-                joined = "\n\n".join(
-                    current,
-                )
+                continue
+
+            current = current.strip()
+
+            if current:
 
                 chunks.append(
-                    TextChunk(
-                        index=chunk_index,
-                        text=joined,
-                        word_count=current_words,
-                        start_word=start_word,
-                        end_word=start_word + current_words,
+                    DocumentChunk(
+                        id=chunk_id,
+                        text=current,
+                        words=len(current.split()),
+                        characters=len(current),
                     )
                 )
 
-                overlap_words = joined.split()[-self.overlap :]
+                chunk_id += 1
 
-                current = [
-                    " ".join(overlap_words),
-                ]
+            overlap_text = ""
 
-                current_words = len(
-                    overlap_words,
+            if self.overlap:
+
+                words = current.split()
+
+                overlap_text = " ".join(
+                    words[-self.overlap:]
                 )
 
-                start_word += (
-                    current_words
-                    - len(overlap_words)
-                )
+            current = overlap_text + "\n\n" + paragraph
 
-                chunk_index += 1
-
-            current.append(
-                paragraph,
-            )
-
-            current_words += paragraph_words
+        current = current.strip()
 
         if current:
 
-            joined = "\n\n".join(
-                current,
-            )
-
             chunks.append(
-                TextChunk(
-                    index=chunk_index,
-                    text=joined,
-                    word_count=current_words,
-                    start_word=start_word,
-                    end_word=start_word + current_words,
+                DocumentChunk(
+                    id=chunk_id,
+                    text=current,
+                    words=len(current.split()),
+                    characters=len(current),
                 )
             )
 

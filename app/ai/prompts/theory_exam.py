@@ -1,72 +1,62 @@
-from app.ai.analyzers.models import DocumentAnalysis
+from __future__ import annotations
 
 
-def build_theory_exam_prompt(
-    analysis: DocumentAnalysis,
-    material: str,
-    duration: int,
-    answer_any: int,
-):
+class TheoryExamPromptBuilder:
 
-    if answer_any >= 10:
-        total = 12
-    else:
-        total = answer_any + 2
+    @staticmethod
+    def build(
+        *,
+        subject: str,
+        topic: str,
+        difficulty: str,
+        question_count: int,
+        content: str,
+    ) -> str:
 
-    return f"""
-You are a senior university lecturer.
+        return f"""
+You are an experienced university examination setter.
 
-Create a REAL university examination paper.
+Generate a professional THEORY examination.
 
-Subject
+Rules
 
-{analysis.subject}
+- Return ONLY valid JSON.
+- No markdown.
+- No explanations outside JSON.
+- Questions must require reasoning.
+- Include define, explain, compare, discuss, evaluate, calculate and analyze questions.
+- Cover the entire study material.
+- Questions should progressively increase in difficulty.
 
-Topic
+JSON FORMAT
 
-{analysis.topic}
+[
+  {{
+    "question":"",
+    "mark":10,
+    "difficulty":"medium",
+    "expected_points":[
+      "",
+      "",
+      ""
+    ],
+    "sample_answer":""
+  }}
+]
 
-Duration
+Subject:
+{subject}
 
-{duration} minutes
+Topic:
+{topic}
 
-Students must answer
+Difficulty:
+{difficulty}
 
-ANY {answer_any} QUESTIONS.
-
-Generate
-
-{total} COMPLETE QUESTIONS.
-
-Each question MUST contain
-
-(a)
-
-(b)
-
-(c)
-
-(d)
-
-Each sub-question must have marks.
-
-Each question must contain a hidden detailed marking guide.
-
-The paper must resemble a real university examination.
-
-Questions must become progressively harder.
-
-Calculation questions where appropriate.
-
-Essay questions where appropriate.
-
-Case studies where appropriate.
-
-Never repeat concepts.
-
-Return ONLY JSON.
+Questions:
+{question_count}
 
 Material
 
-{material}
+{content}
 """

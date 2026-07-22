@@ -12,27 +12,43 @@ from app.ai.extractors.txt import TxtExtractor
 
 
 class ExtractorFactory:
+    """
+    Returns the appropriate extractor
+    based on the uploaded file type.
+    """
 
     def __init__(self) -> None:
 
-        self.extractors: list[BaseExtractor] = [
+        self._extractors: list[BaseExtractor] = [
             PdfExtractor(),
             DocxExtractor(),
             PptxExtractor(),
             TxtExtractor(),
             ImageExtractor(),
-            TopicExtractor(),
         ]
 
-    def get(self, source: Path) -> BaseExtractor:
+        self._topic = TopicExtractor()
 
-        suffix = source.suffix.lower()
+    def get(
+        self,
+        path: str | Path,
+    ) -> BaseExtractor:
 
-        for extractor in self.extractors:
+        path = Path(path)
 
-            if extractor.supports(suffix):
+        extension = path.suffix.lower()
+
+        for extractor in self._extractors:
+
+            if extension in extractor.SUPPORTED_EXTENSIONS:
                 return extractor
 
         raise ValueError(
-            f"Unsupported document type: {suffix}"
+            f"No extractor available for '{extension}'."
         )
+
+    def get_topic(
+        self,
+    ) -> TopicExtractor:
+
+        return self._topic

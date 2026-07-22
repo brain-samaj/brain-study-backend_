@@ -1,51 +1,69 @@
 from __future__ import annotations
 
-import json
+from pathlib import Path
 
-from app.ai.client import AIClient
+from app.ai.services.document_processor import DocumentProcessor
+from app.ai.services.knowledge_builder import KnowledgeBuilder
+from app.ai.services.knowledge_builder import KnowledgeDocument
 
 
-class AIOrchestrator:
+class KnowledgeOrchestrator:
     """
-    Central AI gateway.
+    Central pipeline for every study material.
 
-    Every AI feature in Brain Study
-    should go through this class.
+    Upload
+        ↓
+    Extraction
+        ↓
+    Cleaning
+        ↓
+    Analysis
+        ↓
+    Chunking
+        ↓
+    Knowledge Building
+        ↓
+    Ready for:
 
-    Features
-
-    • Study Guide
-    • Smart Study
-    • Flashcards
-    • Exam Generation
-    • Theory Marking
-    • Objective Marking
-    • Summaries
+        • Study Guide
+        • Smart Study
+        • Flashcards
+        • Practice Exam
     """
 
-    def __init__(self):
+    def __init__(self) -> None:
 
-        self.ai = AIClient()
+        self.processor = DocumentProcessor()
 
-    async def generate_json(
+        self.builder = KnowledgeBuilder()
+
+    async def process_file(
         self,
-        prompt: str,
-    ) -> dict:
+        path: str | Path,
+    ) -> KnowledgeDocument:
 
-        response = await self.ai.generate_json(
-            prompt,
+        processed = await self.processor.process_file(
+            path,
         )
 
-        if isinstance(response, dict):
-            return response
+        return self.builder.build(
+            processed,
+        )
 
-        return json.loads(response)
-
-    async def generate_text(
+    async def process_topic(
         self,
-        prompt: str,
-    ) -> str:
+        *,
+        title: str,
+        subject: str,
+        topic: str,
+    ) -> KnowledgeDocument:
 
-        return await self.ai.generate(
-            prompt,
+        processed = await self.processor.process_topic(
+            title=title,
+            subject=subject,
+            topic=topic,
+        )
+
+        return self.builder.build(
+            processed,
         )

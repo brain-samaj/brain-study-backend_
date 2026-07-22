@@ -5,84 +5,154 @@ from uuid import UUID
 from fastapi import APIRouter
 from fastapi import Depends
 from fastapi import HTTPException
+from fastapi import status
+
 from sqlalchemy.orm import Session
 
-from app.core.database import get_db
-from app.dependencies.auth import get_current_user
-from app.modules.materials.repository import MaterialRepository
-from app.modules.smart_study.service import SmartStudyService
+from app.database.session import get_db
+from app.modules.auth.dependencies import get_current_user
+from app.modules.auth.models import User
+
+from app.modules.knowledge_engine.repository import (
+    KnowledgeRepository,
+)
+
+from app.modules.smart_study.repository import (
+    SmartStudyRepository,
+)
+
+from app.modules.smart_study.service import (
+    SmartStudyService,
+)
+
+from app.modules.smart_study.schemas import (
+    StartSmartStudyRequest,
+    SubmitAnswerRequest,
+)
 
 router = APIRouter(
     prefix="/smart-study",
     tags=["Smart Study"],
 )
 
-@router.post(
-    "/{study_material_id}/start",
-)
-async def start_session(
-    study_material_id: UUID,
-    db: Session = Depends(get_db),
-    current_user=Depends(get_current_user),
-):
 
-    material = MaterialRepository(db).get_by_id(
-        study_material_id,
+def get_service(
+    db: Session = Depends(get_db),
+) -> SmartStudyService:
+
+    repository = SmartStudyRepository(db)
+
+    knowledge_repository = KnowledgeRepository(db)
+
+    return SmartStudyService(
+        repository=repository,
+        knowledge_repository=knowledge_repository,
     )
 
-    if material is None:
-        raise HTTPException(
-            status_code=404,
-            detail="Study material not found.",
+
+@router.post(
+    "/session",
+    status_code=status.HTTP_201_CREATED,
+)
+def start_session(
+    request: StartSmartStudyRequest,
+    current_user: User = Depends(get_current_user),
+    service: SmartStudyService = Depends(get_service),
+):
+
+    try:
+
+        return service.start_session(
+            user_id=current_user.id,
+            source_id=request.source_id,
         )
 
-    service = SmartStudyService(db)
+    except ValueError as exc:
 
-    return await service.next_question(
-        user=current_user,
-        study_material=material,
-        analysis=material.analysis,
-    )
+        raise HTTPException(
+            status_code=400,
+            detail=str(exc),
+        )
 
-from pydantic import BaseModel
-
-
-class SubmitAnswerRequest(BaseModel):
-
-    session_id: UUID
-
-    question_id: UUID
-
-    answer: str
-
-@router.post("/submit")
-async def submit_answer(
-    payload: SubmitAnswerRequest,
-    db: Session = Depends(get_db),
-    current_user=Depends(get_current_user),
-):
-
-    service = SmartStudyService(db)
-
-    return await service.submit_answer(
-        session_id=payload.session_id,
-        question_id=payload.question_id,
-        student_answer=payload.answer,
-        user=current_user,
-    )
 
 @router.get(
-    "/dashboard/{study_material_id}",
+    "/{session_id}/next",
 )
-def dashboard(
-    study_material_id: UUID,
-    db: Session = Depends(get_db),
-    current_user=Depends(get_current_user),
+async def next_question(
+    session_id: UUID,
+    current_user: User = Depends(get_current_user),
+    service: SmartStudyService = Depends(get_service),
 ):
 
-    service = SmartStudyService(db)
+    try:
 
-    return service.dashboard(
-        user_id=current_user.id,
-        study_material_id=study_material_id,
+        return await service.next_question(
+            session_id=session_id,
+        )
+
+    except ValueError as exc:
+
+        raise HTTPException(
+            status_code=404,
+            detail=str(exc),
+        )
+
+
+@router.post(
+    "/{session_id}/answer",
+)
+def submit_answer(
+    session_id: UUID,
+    request: SubmitAnswerRequest,
+    current_user: User = Depends(get_current_user),
+    service: SmartStudyService = Depends(get_service),
+):
+
+    try:
+
+        return service.submit_answer(
+            session_id=session_id,
+            question=request.question,
+            selected_answer=request.selected_answer,
+        )
+
+    except ValueError as exc:
+
+        raise HTTPException(
+            status_code=400,
+            detail=str(exc),
+        )
+
+
+@router.get(
+    "/{session_id}/progress",
+)
+def progress(
+    session_id: UUID,
+    current_user: User = Depends(get_current_user),
+    service: SmartStudyService = Depends(get_service),
+):
+
+    session = service.repository.get_session(
+        session_id,
     )
+
+    if session is None:
+
+        raise HTTPException(
+            status_code=404,
+            detail="Study session not found.",
+        )
+
+    return {
+        "session_id": session.id,
+        "total_questions": session.total_questions,
+        "correct_answers": session.correct_answers,
+        "wrong_answers": session.wrong_answers,
+        "mastery_score": session.mastery_score,
+        "difficulty": session.difficulty_level,
+        "current_streak": session.current_streak,
+        "longest_streak": session.longest_streak,
+        "completed": session.is_completed,
+    }
+

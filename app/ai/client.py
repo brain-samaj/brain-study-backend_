@@ -1,62 +1,67 @@
 from __future__ import annotations
 
-import json
+from functools import lru_cache
 
-from groq import AsyncGroq
+from app.ai.providers.base import BaseAIProvider
+from app.ai.providers.groq import GroqProvider
 
-from app.core.config import settings
+
+@lru_cache(maxsize=1)
+def get_provider() -> BaseAIProvider:
+    """
+    Returns the configured language model provider.
+
+    Using a singleton avoids recreating the HTTP client
+    for every request.
+    """
+    return GroqProvider()
 
 
 class AIClient:
+    """
+    High-level interface used throughout the backend.
 
-    def __init__(self):
+    Study Guide
+    Smart Study
+    Flashcards
+    Practice Exam
 
-        self.client = AsyncGroq(
-            api_key=settings.GROQ_API_KEY,
-        )
+    All communicate through this class rather than
+    talking directly to the provider.
+    """
 
-        self.model = settings.GROQ_MODEL
+    def __init__(
+        self,
+        provider: BaseAIProvider | None = None,
+    ) -> None:
+
+        self.provider = provider or get_provider()
 
     async def generate(
         self,
+        *,
         prompt: str,
+        temperature: float = 0.2,
+        max_tokens: int = 4096,
     ) -> str:
 
-        response = await self.client.chat.completions.create(
-            model=self.model,
-            temperature=0.2,
-            messages=[
-                {
-                    "role": "system",
-                    "content": (
-                        "You are Brain Study AI, an elite educational AI."
-                    ),
-                },
-                {
-                    "role": "user",
-                    "content": prompt,
-                },
-            ],
+        return await self.provider.generate(
+            prompt=prompt,
+            temperature=temperature,
+            max_tokens=max_tokens,
         )
-
-        return response.choices[0].message.content.strip()
 
     async def generate_json(
         self,
+        *,
         prompt: str,
-    ):
+        temperature: float = 0.2,
+    ) -> dict:
 
-        text = await self.generate(prompt)
+        return await self.provider.generate_json(
+            prompt=prompt,
+            temperature=temperature,
+        )
 
-        text = text.strip()
-
-        if text.startswith("```json"):
-            text = text[7:]
-
-        if text.startswith("```"):
-            text = text[3:]
-
-        if text.endswith("```"):
-            text = text[:-3]
-
-        return json.loads(text.strip())
+    async def health(self) -> bool:
+        return await self.provider.health()

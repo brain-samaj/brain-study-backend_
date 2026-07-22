@@ -1,17 +1,24 @@
 from __future__ import annotations
 
-import html
 import re
 
 
 class TextCleaner:
     """
-    Cleans extracted text from PDF, DOCX, PPT,
-    OCR images and manual topic descriptions.
+    Production-grade text normalization.
 
-    Every uploaded source passes through this class
-    before chunking or embedding.
+    Responsibilities
+
+    - Normalize whitespace
+    - Remove duplicate blank lines
+    - Normalize Unicode quotes/dashes
+    - Remove page artefacts
+    - Remove repeated headers/footers
+    - Preserve educational content
     """
+
+    _MULTISPACE = re.compile(r"[ \t]+")
+    _MULTIBLANK = re.compile(r"\n{3,}")
 
     def clean(
         self,
@@ -21,56 +28,49 @@ class TextCleaner:
         if not text:
             return ""
 
-        text = html.unescape(text)
-
+        text = text.replace("\r\n", "\n")
         text = text.replace("\r", "\n")
 
-        text = re.sub(
-            r"\n{3,}",
-            "\n\n",
-            text,
-        )
+        replacements = {
+            "“": '"',
+            "”": '"',
+            "‘": "'",
+            "’": "'",
+            "–": "-",
+            "—": "-",
+            "\u00A0": " ",
+            "\t": " ",
+        }
 
-        text = re.sub(
-            r"[ \t]+",
-            " ",
-            text,
-        )
+        for old, new in replacements.items():
+            text = text.replace(old, new)
 
-        text = re.sub(
-            r"\s+([.,;:!?])",
-            r"\1",
-            text,
-        )
+        cleaned_lines: list[str] = []
+
+        previous = ""
+
+        for line in text.split("\n"):
+
+            line = self._MULTISPACE.sub(" ", line).strip()
+
+            if not line:
+                cleaned_lines.append("")
+                continue
+
+            lower = line.lower()
+
+            if lower.startswith("page ") and len(line) < 20:
+                continue
+
+            if line == previous:
+                continue
+
+            previous = line
+
+            cleaned_lines.append(line)
+
+        text = "\n".join(cleaned_lines)
+
+        text = self._MULTIBLANK.sub("\n\n", text)
 
         return text.strip()
-
-
-    def normalize_unicode(
-        self,
-        text: str,
-    ) -> str:
-
-        return (
-            text.encode(
-                "utf-8",
-                errors="ignore",
-            )
-            .decode(
-                "utf-8",
-            )
-        )
-
-
-    def prepare(
-        self,
-        text: str,
-    ) -> str:
-
-        text = self.normalize_unicode(
-            text,
-        )
-
-        return self.clean(
-            text,
-        )

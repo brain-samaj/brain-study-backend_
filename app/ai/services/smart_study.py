@@ -1,181 +1,33 @@
 from __future__ import annotations
 
 from app.ai.client import AIClient
-from app.ai.prompts import RICH_OUTPUT_PROMPT
-from app.ai.services.question_strategy import QuestionStrategy
+from app.ai.prompts.smart_study import SmartStudyPromptBuilder
+from app.ai.analyzers.models import DocumentAnalysis
 
 
-class SmartStudyEngine:
-    """
-    Adaptive AI tutor.
+class SmartStudyAIService:
 
-    Unlike exams, Smart Study never ends.
+    def __init__(self) -> None:
+        self.client = AIClient()
 
-    It continuously generates questions,
-    evaluates the student's understanding,
-    explains mistakes,
-    and adjusts difficulty.
-    """
-
-    def __init__(self):
-
-        self.ai = AIClient()
-
-        self.strategy = QuestionStrategy()
-
-    async def next_question(
+    async def generate_question(
         self,
         *,
-        study_material,
-        analysis: dict,
-        user,
-        learning_state: dict,
-    ):
+        analysis: DocumentAnalysis,
+        content: str,
+        previous_questions: list[str],
+        weak_topics: list[str],
+        difficulty: str,
+    ) -> dict:
 
-        plan = self.strategy.build_generation_plan(
+        prompt = SmartStudyPromptBuilder.build(
             analysis=analysis,
-            education_level=user.education_level,
-            total_questions=1,
-            difficulty=learning_state.get(
-                "difficulty",
-                "adaptive",
-            ),
+            content=content,
+            previous_questions=previous_questions,
+            weak_topics=weak_topics,
+            difficulty=difficulty,
         )
 
-        prompt = self.build_prompt(
-            study_material=study_material,
-            analysis=analysis,
-            plan=plan,
-            learning_state=learning_state,
-        )
+        response = await self.client.generate_json(prompt)
 
-        return await self.ai.generate_json(
-            prompt,
-        )
-
-    def build_prompt(
-        self,
-        *,
-        study_material,
-        analysis: dict,
-        plan: dict,
-        learning_state: dict,
-    ) -> str:
-
-        return f"""
-{RICH_OUTPUT_PROMPT}
-
-You are Brain Study AI.
-
-You are NOT generating an exam.
-
-You are tutoring a university student.
-
-======================================
-
-Subject
-
-{analysis["Subject"]}
-
-Main Topic
-
-{analysis["Main Topic"]}
-
-Sub Topics
-
-{analysis["Sub Topics"]}
-
-======================================
-
-Student Progress
-
-{learning_state}
-
-======================================
-
-Rules
-
-Generate exactly ONE question.
-
-Never say
-
-Question 1
-
-Question 2
-
-Question 3
-
-Never show numbering.
-
-Never show score.
-
-Never mention remaining questions.
-
-The student should simply feel
-the conversation continues naturally.
-
-======================================
-
-After every answer
-
-Return
-
-Correct Answer
-
-Detailed Explanation
-
-Why the chosen answer is wrong (if applicable)
-
-Study Tip
-
-Difficulty
-
-Topic
-
-Learning Objective
-
-======================================
-
-If calculations are required
-
-Return complete worked solutions.
-
-======================================
-
-If formulas exist
-
-Return LaTeX.
-
-======================================
-
-If diagrams help
-
-Return diagram blocks.
-
-======================================
-
-Question types may include
-
-Definition
-
-Application
-
-Scenario
-
-Calculation
-
-Diagram interpretation
-
-Code analysis
-
-Case study
-
-Never repeat previous questions.
-
-Return ONLY LearningDocument JSON.
-
-Study Material
-
-{study_material.extracted_text[:25000]}
-"""
-
+        return response

@@ -1,77 +1,49 @@
-from app.ai.analyzers.models import DocumentAnalysis
+from __future__ import annotations
 
 
-def build_prompt(
-    analysis: DocumentAnalysis,
-    material: str,
-) -> str:
+class FlashcardPromptBuilder:
 
-    return f"""
-You are an expert educator.
+    @staticmethod
+    def build(
+        *,
+        subject: str,
+        topic: str,
+        content: str,
+    ) -> str:
 
-Create intelligent flashcards.
+        return f"""
+You are one of the world's best teachers.
 
-Subject
-
-{analysis.subject}
-
-Topic
-
-{analysis.topic}
-
-Difficulty
-
-{analysis.difficulty}
+Generate high-quality flashcards from the study material.
 
 Rules
 
-Create high-quality flashcards.
+- Return ONLY valid JSON.
+- Do not include markdown.
+- Generate between 25 and 60 flashcards.
+- Cover ALL important concepts.
+- Mix definitions, facts, formulas, concepts and applications.
+- Questions must be concise.
+- Answers must be clear and educational.
+- Avoid duplicates.
 
-Never create duplicate cards.
+JSON FORMAT
 
-One fact per card.
+[
+  {{
+    "question": "",
+    "answer": "",
+    "difficulty": "easy"
+  }}
+]
 
-If Mathematics
+Subject:
+{subject}
 
-Front = Question or Formula
+Topic:
+{topic}
 
-Back = Complete explanation and worked solution.
+Material:
 
-If Physics
-
-Include units and formulas.
-
-If Biology
-
-Front = Process or Structure
-
-Back = Complete explanation.
-
-If Programming
-
-Front = Code or Concept
-
-Back = Explanation and example.
-
-If History
-
-Front = Event
-
-Back = Explanation, significance and date.
-
-If Law
-
-Front = Principle
-
-Back = Meaning and application.
-
-If Chemistry
-
-Include reactions where necessary.
-
-Return ONLY JSON.
-
-Material
-
-{material}
+{content}
 """

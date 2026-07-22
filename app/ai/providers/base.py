@@ -2,37 +2,62 @@ from __future__ import annotations
 
 from abc import ABC
 from abc import abstractmethod
+from typing import Iterable
 
 
-class AIProvider(ABC):
+class BaseAIProvider(ABC):
     """
-    Base class for every AI provider.
+    Abstract interface implemented by every LLM provider.
 
-    Every provider must implement these methods.
+    Examples:
+
+    - Groq
+    - OpenAI
+    - Anthropic
+    - Local models
     """
 
     @abstractmethod
     async def generate(
         self,
-        prompt: str,
         *,
+        prompt: str,
         temperature: float = 0.2,
-        model: str | None = None,
+        max_tokens: int = 4096,
     ) -> str:
-        ...
+        """
+        Generate a completion.
+        """
+        raise NotImplementedError
 
     @abstractmethod
     async def generate_json(
         self,
-        prompt: str,
         *,
+        prompt: str,
         temperature: float = 0.2,
-        model: str | None = None,
     ) -> dict:
-        ...
+        """
+        Generate structured JSON.
+        """
+        raise NotImplementedError
 
     @abstractmethod
-    async def health_check(
+    async def embeddings(
         self,
-    ) -> bool:
-        ...
+        texts: Iterable[str],
+    ) -> list[list[float]]:
+        """
+        Generate embeddings.
+
+        Providers that don't support embeddings
+        should raise NotImplementedError.
+        """
+        raise NotImplementedError
+
+    @abstractmethod
+    async def health(self) -> bool:
+        """
+        Provider health check.
+        """
+        raise NotImplementedError

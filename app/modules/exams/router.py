@@ -32,7 +32,6 @@ from app.modules.exams.schemas import (
 
 from app.ai.services.theory_marker import TheoryMarker
 from app.ai.services.exam_generator import ExamGenerator
-from app.ai.services.ocr import OCRService
 
 
 router = APIRouter(

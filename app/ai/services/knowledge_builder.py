@@ -1,68 +1,74 @@
 from __future__ import annotations
 
-from app.ai.services.document_processor import DocumentProcessor
-from app.ai.services.study_guide_generator import StudyGuideGenerator
-from app.ai.services.flashcard_generator import FlashcardGenerator
-from app.ai.services.exam_generator import ExamGenerator
-from app.modules.knowledge_engine.models import KnowledgeSource
-from app.modules.knowledge_engine.repository import KnowledgeRepository
+from dataclasses import dataclass
+
+from app.ai.services.document_processor import ProcessedDocument
+
+
+@dataclass(slots=True)
+class KnowledgeDocument:
+    """
+    Canonical knowledge representation.
+
+    Every downstream learning feature consumes this
+    object instead of raw extracted text.
+    """
+
+    title: str
+
+    subject: str
+
+    topic: str
+
+    difficulty: str
+
+    language: str
+
+    education_level: str
+
+    cleaned_text: str
+
+    keywords: list[str]
+
+    learning_objectives: list[str]
+
+    important_terms: list[str]
+
+    prerequisites: list[str]
+
+    chunk_count: int
+
+    chunks: list[str]
 
 
 class KnowledgeBuilder:
     """
-    Complete AI pipeline.
-
-    Upload
-        ↓
-    Extract Text
-        ↓
-    Clean Text
-        ↓
-    Study Guide
-        ↓
-    Flashcards
-        ↓
-    Exams
+    Converts a processed document into
+    Brain Study's internal knowledge format.
     """
 
-    def __init__(
+    def build(
         self,
-        repository: KnowledgeRepository,
-    ):
-        self.repository = repository
+        processed: ProcessedDocument,
+    ) -> KnowledgeDocument:
 
-        self.processor = DocumentProcessor(
-            repository,
-        )
+        analysis = processed.analysis
 
-        self.study_guide = StudyGuideGenerator()
-
-        self.flashcards = FlashcardGenerator()
-
-        self.exam = ExamGenerator()
-
-    async def build(
-        self,
-        source: KnowledgeSource,
-    ) -> None:
-
-        source = await self.processor.process(
-            source,
-        )
-
-        if not source.cleaned_text:
-            raise ValueError(
-                "No extracted text."
-            )
-
-        await self.study_guide.generate(
-            source=source,
-        )
-
-        await self.flashcards.generate(
-            source=source,
-        )
-
-        await self.exam.generate(
-            source=source,
+        return KnowledgeDocument(
+            title=analysis.title,
+            subject=analysis.subject,
+            topic=analysis.topic,
+            difficulty=analysis.difficulty,
+            language=analysis.language,
+            education_level=analysis.education_level,
+            cleaned_text=processed.cleaned_text,
+            keywords=analysis.keywords,
+            learning_objectives=analysis.learning_objectives,
+            important_terms=analysis.important_terms,
+            prerequisites=analysis.prerequisites,
+            chunk_count=processed.chunk_count,
+            chunks=[
+                chunk.text
+                for chunk in processed.chunks
+            ],
         )

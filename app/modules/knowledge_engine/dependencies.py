@@ -10,4 +10,5 @@ from app.modules.knowledge_engine.repository import KnowledgeRepository
 def get_repository(
     db: Session = Depends(get_db),
 ) -> KnowledgeRepository:
+
     return KnowledgeRepository(db)

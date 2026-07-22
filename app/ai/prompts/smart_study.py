@@ -1,76 +1,143 @@
+from __future__ import annotations
+
 from app.ai.analyzers.models import DocumentAnalysis
 
 
-def build_prompt(
-    analysis: DocumentAnalysis,
-    text: str,
-    previous: list[str],
-) -> str:
+class SmartStudyPromptBuilder:
 
-    return f"""
-You are Brain Study's adaptive tutor.
+    @staticmethod
+    def build(
+        analysis: DocumentAnalysis,
+        content: str,
+        previous_questions: list[str] | None = None,
+        difficulty: str | None = None,
+        weak_topics: list[str] | None = None,
+    ) -> str:
 
-Generate ONLY ONE question.
+        previous_questions = previous_questions or []
+        weak_topics = weak_topics or []
 
-Subject
+        return f"""
+You are Brain Study AI.
 
+You are NOT a chatbot.
+
+You are the Smart Study Engine.
+
+Your job is to continuously generate NEW multiple-choice revision questions from the student's uploaded material.
+
+The system generates ONE question at a time.
+
+The student answers.
+
+The system immediately marks the answer.
+
+The correct answer and explanation are shown.
+
+Then another NEW question is generated.
+
+This continues forever until the student exits Smart Study.
+
+------------------------------------
+
+RULES
+
+Never repeat previous questions.
+
+Never copy textbook sentences.
+
+Questions must be challenging.
+
+Questions must cover the entire material.
+
+Focus more on weak topics.
+
+Use Bloom's Taxonomy.
+
+Increase difficulty when performance improves.
+
+Decrease difficulty when performance drops.
+
+Every question MUST have exactly four options.
+
+Only ONE correct answer.
+
+Wrong options must sound believable.
+
+Explanation must teach.
+
+------------------------------------
+
+PREVIOUS QUESTIONS
+
+{chr(10).join(previous_questions)}
+
+------------------------------------
+
+WEAK TOPICS
+
+{chr(10).join(weak_topics)}
+
+------------------------------------
+
+DOCUMENT INFORMATION
+
+Subject:
 {analysis.subject}
 
-Topic
-
+Topic:
 {analysis.topic}
 
-Difficulty
+Difficulty:
+{difficulty or analysis.difficulty}
 
-Adaptive.
+Learning Style:
+{analysis.learning_style}
 
-Already Asked
+------------------------------------
 
-{previous}
+RETURN JSON ONLY
 
-Rules
+{{
+    "question":"",
 
-Never repeat a previous question.
+    "options":[
+        {{
+            "id":"A",
+            "text":""
+        }},
+        {{
+            "id":"B",
+            "text":""
+        }},
+        {{
+            "id":"C",
+            "text":""
+        }},
+        {{
+            "id":"D",
+            "text":""
+        }}
+    ],
 
-Question must come ONLY from the uploaded material.
+    "correct_answer":"A",
 
-If Mathematics or Physics
+    "explanation":"",
 
-Generate calculation questions.
+    "concept":"",
 
-If Programming
+    "difficulty":"easy",
 
-Generate debugging or code questions.
+    "estimated_time_seconds":30,
 
-If Biology
+    "tags":[
+        ""
+    ]
+}}
 
-Generate process questions.
+------------------------------------
 
-If Medicine
+STUDY MATERIAL
 
-Generate clinical questions.
-
-If History
-
-Generate reasoning questions.
-
-If Law
-
-Generate scenario questions.
-
-If Literature
-
-Generate interpretation questions.
-
-Immediately include
-
-Correct answer
-
-Explanation
-
-Return ONLY JSON
-
-Material
-
-{text}
+{content}
 """

@@ -1,25 +1,52 @@
 from __future__ import annotations
 
-from pydantic import BaseModel, Field
+from dataclasses import dataclass, field
 
 
-class DocumentAnalysis(BaseModel):
+@dataclass(slots=True)
+class DocumentAnalysis:
+    """
+    Structured analysis describing a study document.
+
+    This drives every learning feature inside Brain Study.
+    """
+
+    title: str
+
     subject: str
-    topic: str
-    subtopics: list[str] = Field(default_factory=list)
 
-    learning_style: str
+    topic: str
 
     difficulty: str
 
-    requires_calculations: bool
-    requires_worked_examples: bool
-    requires_formulas: bool
-    requires_code: bool
-    requires_diagrams: bool
-    requires_tables: bool
-    requires_memorization: bool
-
     language: str
 
-    confidence: float
+    education_level: str
+
+    estimated_reading_minutes: int
+
+    word_count: int
+
+    requires_calculations: bool = False
+
+    requires_formulae: bool = False
+
+    requires_tables: bool = False
+
+    requires_diagrams: bool = False
+
+    requires_code: bool = False
+
+    requires_memorization: bool = False
+
+    keywords: list[str] = field(default_factory=list)
+
+    learning_objectives: list[str] = field(default_factory=list)
+
+    important_terms: list[str] = field(default_factory=list)
+
+    prerequisites: list[str] = field(default_factory=list)
+
+    learning_style: str = "mixed"
+
+    confidence: float = 0.0

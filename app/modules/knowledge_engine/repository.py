@@ -2,19 +2,18 @@ from __future__ import annotations
 
 import shutil
 from datetime import datetime
-from datetime import timezone
 from pathlib import Path
 from uuid import UUID
-from uuid import uuid4
 
 from fastapi import UploadFile
 from sqlalchemy.orm import Session
 
+from app.ai.orchestrator import KnowledgeOrchestrator
 from app.modules.knowledge_engine.models import KnowledgeSource
 
 
-UPLOAD_ROOT = Path("storage/knowledge")
-UPLOAD_ROOT.mkdir(parents=True, exist_ok=True)
+UPLOAD_DIRECTORY = Path("storage/knowledge")
+UPLOAD_DIRECTORY.mkdir(parents=True, exist_ok=True)
 
 
 class KnowledgeRepository:
@@ -24,142 +23,109 @@ class KnowledgeRepository:
         db: Session,
     ):
         self.db = db
+        self.orchestrator = KnowledgeOrchestrator()
 
-    def create_topic(
+    async def create_topic(
         self,
         *,
         user_id: UUID,
         title: str,
         subject: str,
         topic_description: str,
-    ) -> KnowledgeSource:
+    ):
 
         source = KnowledgeSource(
             user_id=user_id,
-            source_type="topic",
             title=title,
             subject=subject,
+            source_type="topic",
             description=topic_description,
-            raw_text=topic_description,
-            cleaned_text=topic_description,
-            processing_status="completed",
-            processed_at=datetime.now(timezone.utc),
+            processing_status="processing",
         )
 
         self.db.add(source)
         self.db.commit()
         self.db.refresh(source)
 
-        return source
+        try:
+
+            knowledge = await self.orchestrator.process_topic(
+                title=title,
+                subject=subject,
+                topic=topic_description,
+            )
+
+            source.raw_text = knowledge.cleaned_text
+            source.cleaned_text = knowledge.cleaned_text
+            source.processing_status = "completed"
+            source.processed_at = datetime.utcnow()
+
+            self.db.commit()
+            self.db.refresh(source)
+
+            return source
+
+        except Exception as exc:
+
+            source.processing_status = "failed"
+            source.error_message = str(exc)
+
+            self.db.commit()
+
+            raise
 
     async def save_document(
         self,
         *,
         user_id: UUID,
         file: UploadFile,
-    ) -> KnowledgeSource:
+    ):
 
-        extension = Path(file.filename).suffix.lower()
+        filename = f"{datetime.utcnow().timestamp()}_{file.filename}"
 
-        filename = f"{uuid4()}{extension}"
-
-        user_directory = UPLOAD_ROOT / str(user_id)
-
-        user_directory.mkdir(
-            parents=True,
-            exist_ok=True,
-        )
-
-        destination = user_directory / filename
+        destination = UPLOAD_DIRECTORY / filename
 
         with destination.open("wb") as buffer:
-            shutil.copyfileobj(
-                file.file,
-                buffer,
-            )
-
-        size = destination.stat().st_size
+            shutil.copyfileobj(file.file, buffer)
 
         source = KnowledgeSource(
             user_id=user_id,
-            source_type="document",
             title=Path(file.filename).stem,
             subject="General",
+            source_type=destination.suffix.lower().replace(".", ""),
             file_name=file.filename,
             file_path=str(destination),
-            file_size=size,
             mime_type=file.content_type,
-            processing_status="pending",
+            file_size=destination.stat().st_size,
+            processing_status="processing",
         )
 
         self.db.add(source)
         self.db.commit()
         self.db.refresh(source)
 
-        return source
+        try:
 
-    def get(
-        self,
-        knowledge_id: UUID,
-    ) -> KnowledgeSource | None:
-
-        return (
-            self.db.query(KnowledgeSource)
-            .filter(
-                KnowledgeSource.id == knowledge_id,
+            knowledge = await self.orchestrator.process_file(
+                destination,
             )
-            .first()
-        )
 
-    def list_by_user(
-        self,
-        user_id: UUID,
-    ) -> list[KnowledgeSource]:
+            source.subject = knowledge.subject
+            source.raw_text = knowledge.cleaned_text
+            source.cleaned_text = knowledge.cleaned_text
+            source.processing_status = "completed"
+            source.processed_at = datetime.utcnow()
 
-        return (
-            self.db.query(KnowledgeSource)
-            .filter(
-                KnowledgeSource.user_id == user_id,
-            )
-            .order_by(
-                KnowledgeSource.created_at.desc(),
-            )
-            .all()
-        )
+            self.db.commit()
+            self.db.refresh(source)
 
-    def update_processing(
-        self,
-        source: KnowledgeSource,
-        *,
-        status: str,
-        raw_text: str | None = None,
-        cleaned_text: str | None = None,
-        error_message: str | None = None,
-    ) -> KnowledgeSource:
+            return source
 
-        source.processing_status = status
-        source.raw_text = raw_text
-        source.cleaned_text = cleaned_text
-        source.error_message = error_message
-        source.processed_at = datetime.now(
-            timezone.utc,
-        )
+        except Exception as exc:
 
-        self.db.commit()
-        self.db.refresh(source)
+            source.processing_status = "failed"
+            source.error_message = str(exc)
 
-        return source
+            self.db.commit()
 
-    def delete(
-        self,
-        source: KnowledgeSource,
-    ) -> None:
-
-        if source.file_path:
-            path = Path(source.file_path)
-
-            if path.exists():
-                path.unlink()
-
-        self.db.delete(source)
-        self.db.commit()
+            raise

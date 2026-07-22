@@ -1,6 +1,6 @@
 """add subject to knowledge_sources
 
-Revision ID: xxxxxxxx
+Revision ID: 5c4f9e8d7a12
 Revises: 43d856437cef
 Create Date: 2026-07-21
 """
@@ -9,8 +9,8 @@ from alembic import op
 import sqlalchemy as sa
 
 
-revision = "xxxxxxxx"
-down_revision = "43d856437cef"
+revision = "5c4f9e8d7a12"
+down_revision = "1b7aa845dad6"
 branch_labels = None
 depends_on = None
 

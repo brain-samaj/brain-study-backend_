@@ -2,32 +2,52 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from app.ai.analyzers.document_analyzer import DocumentAnalyzer
+from app.ai.extractors.base import ExtractionResult
 from app.ai.extractors.factory import ExtractorFactory
 
 
-class DocumentExtractorService:
+class DocumentExtractor:
+    """
+    Unified extraction service.
+
+    Supports:
+
+    • PDF
+    • DOCX
+    • PPTX
+    • TXT
+    • Images (OCR)
+    • Topic text
+
+    Every uploaded study material enters the
+    system through this service.
+    """
 
     def __init__(self) -> None:
         self.factory = ExtractorFactory()
-        self.analyzer = DocumentAnalyzer()
 
-    def process(
+    async def extract(
         self,
-        source: str | Path,
-    ):
+        path: str | Path,
+    ) -> ExtractionResult:
 
-        source = Path(source)
+        path = Path(path)
 
-        extractor = self.factory.get(source)
+        extractor = self.factory.get(path)
 
-        extraction = extractor.extract(source)
+        return await extractor.extract(path)
 
-        analysis = self.analyzer.analyze(
-            extraction.text,
+    async def extract_topic(
+        self,
+        title: str,
+        subject: str,
+        topic: str,
+    ) -> ExtractionResult:
+
+        extractor = self.factory.get_topic()
+
+        return await extractor.extract(
+            title=title,
+            subject=subject,
+            topic=topic,
         )
-
-        return {
-            "extraction": extraction,
-            "analysis": analysis,
-        }

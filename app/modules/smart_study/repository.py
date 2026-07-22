@@ -2,14 +2,13 @@ from __future__ import annotations
 
 from uuid import UUID
 
+from sqlalchemy import Select
+from sqlalchemy import desc
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.modules.smart_study.models import SmartStudyProgress
-from app.modules.smart_study.topic_progress_models import TopicProgress
-from app.modules.smart_study.question_history_models import (
-    SmartStudyQuestionHistory,
-)
+from app.modules.smart_study.models import QuestionHistory
+from app.modules.smart_study.models import SmartStudySession
 
 
 class SmartStudyRepository:
@@ -18,360 +17,135 @@ class SmartStudyRepository:
         self,
         db: Session,
     ):
-
         self.db = db
 
-    ########################################################
-    # OVERALL PROGRESS
-    ########################################################
+    # --------------------------------------------------
+    # Session
+    # --------------------------------------------------
 
-    def get_progress(
+    def create_session(
         self,
         *,
         user_id: UUID,
-        study_material_id: UUID,
-    ) -> SmartStudyProgress | None:
+        source_id: UUID,
+    ) -> SmartStudySession:
 
-        return (
-            self.db.execute(
-                select(
-                    SmartStudyProgress,
-                ).where(
-                    SmartStudyProgress.user_id == user_id,
-                    SmartStudyProgress.study_material_id == study_material_id,
-                )
-            )
-            .scalars()
-            .first()
+        session = SmartStudySession(
+            user_id=user_id,
+            source_id=source_id,
+            total_questions=0,
+            correct_answers=0,
+            wrong_answers=0,
+            current_streak=0,
+            longest_streak=0,
+            mastery_score=0.0,
+            difficulty_level="easy",
+            is_completed=False,
         )
 
-    def save_progress(
-        self,
-        progress: SmartStudyProgress,
-    ) -> SmartStudyProgress:
-
-        self.db.add(progress)
-
+        self.db.add(session)
         self.db.commit()
+        self.db.refresh(session)
 
-        self.db.refresh(progress)
+        return session
 
-        return progress
+    def get_session(
+        self,
+        session_id: UUID,
+    ) -> SmartStudySession | None:
 
-    ########################################################
-    # TOPIC PROGRESS
-    ########################################################
+        statement: Select = (
+            select(SmartStudySession)
+            .where(
+                SmartStudySession.id == session_id,
+            )
+        )
 
-    def get_topic_progress(
+        return self.db.scalar(statement)
+
+    def save_session(
+        self,
+        session: SmartStudySession,
+    ) -> SmartStudySession:
+
+        self.db.add(session)
+        self.db.commit()
+        self.db.refresh(session)
+
+        return session
+
+    # --------------------------------------------------
+    # Question History
+    # --------------------------------------------------
+
+    def add_question(
         self,
         *,
-        user_id: UUID,
-        study_material_id: UUID,
-        topic: str,
-    ) -> TopicProgress | None:
+        session_id: UUID,
+        question: str,
+        correct_answer: str,
+        selected_answer: str | None,
+        is_correct: bool | None,
+        explanation: str,
+        concept: str,
+        difficulty: str,
+    ) -> QuestionHistory:
 
-        return (
-            self.db.execute(
-                select(
-                    TopicProgress,
-                ).where(
-                    TopicProgress.user_id == user_id,
-                    TopicProgress.study_material_id == study_material_id,
-                    TopicProgress.topic == topic,
-                )
-            )
-            .scalars()
-            .first()
+        history = QuestionHistory(
+            session_id=session_id,
+            question=question,
+            correct_answer=correct_answer,
+            selected_answer=selected_answer,
+            is_correct=is_correct,
+            explanation=explanation,
+            concept=concept,
+            difficulty=difficulty,
         )
 
-    def save_topic_progress(
-        self,
-        progress: TopicProgress,
-    ) -> TopicProgress:
-
-        self.db.add(progress)
-
+        self.db.add(history)
         self.db.commit()
+        self.db.refresh(history)
 
-        self.db.refresh(progress)
+        return history
 
-        return progress
-
-    def list_topics(
+    def get_previous_questions(
         self,
-        *,
-        user_id: UUID,
-        study_material_id: UUID,
-    ) -> list[TopicProgress]:
+        session_id: UUID,
+    ) -> list[str]:
 
-        return (
-            self.db.execute(
-                select(
-                    TopicProgress,
-                ).where(
-                    TopicProgress.user_id == user_id,
-                    TopicProgress.study_material_id == study_material_id,
-                )
+        statement = (
+            select(
+                QuestionHistory.question,
             )
-            .scalars()
-            .all()
+            .where(
+                QuestionHistory.session_id == session_id,
+            )
+            .order_by(
+                desc(QuestionHistory.created_at),
+            )
         )
 
-
-    ########################################################
-    # QUESTION HISTORY
-    ########################################################
-
-    def save_question(
-        self,
-        question: SmartStudyQuestionHistory,
-    ) -> SmartStudyQuestionHistory:
-
-        self.db.add(question)
-
-        self.db.commit()
-
-        self.db.refresh(question)
-
-        return question
-
-    def recent_questions(
-        self,
-        *,
-        user_id: UUID,
-        study_material_id: UUID,
-        limit: int = 20,
-    ) -> list[SmartStudyQuestionHistory]:
-
-        return (
-            self.db.execute(
-                select(
-                    SmartStudyQuestionHistory,
-                )
-                .where(
-                    SmartStudyQuestionHistory.user_id == user_id,
-                    SmartStudyQuestionHistory.study_material_id == study_material_id,
-                )
-                .order_by(
-                    SmartStudyQuestionHistory.created_at.desc(),
-                )
-                .limit(limit)
-            )
-            .scalars()
-            .all()
-        )
-
-    def update_question(
-        self,
-        question: SmartStudyQuestionHistory,
-    ) -> SmartStudyQuestionHistory:
-
-        self.db.add(question)
-
-        self.db.commit()
-
-        self.db.refresh(question)
-
-        return question
-
-    ########################################################
-    # LEARNING ANALYTICS
-    ########################################################
+        return list(self.db.scalars(statement).all())
 
     def get_weak_topics(
         self,
-        *,
-        user_id: UUID,
-        study_material_id: UUID,
-        threshold: float = 0.60,
-    ) -> list[TopicProgress]:
+        session_id: UUID,
+    ) -> list[str]:
 
-        return (
-            self.db.execute(
-                select(TopicProgress)
-                .where(
-                    TopicProgress.user_id == user_id,
-                    TopicProgress.study_material_id == study_material_id,
-                    TopicProgress.mastery_score < threshold,
-                )
-                .order_by(
-                    TopicProgress.mastery_score.asc(),
-                )
+        statement = (
+            select(
+                QuestionHistory.concept,
             )
-            .scalars()
-            .all()
-        )
-
-    def get_mastered_topics(
-        self,
-        *,
-        user_id: UUID,
-        study_material_id: UUID,
-        threshold: float = 0.85,
-    ) -> list[TopicProgress]:
-
-        return (
-            self.db.execute(
-                select(TopicProgress)
-                .where(
-                    TopicProgress.user_id == user_id,
-                    TopicProgress.study_material_id == study_material_id,
-                    TopicProgress.mastery_score >= threshold,
-                )
-                .order_by(
-                    TopicProgress.mastery_score.desc(),
-                )
+            .where(
+                QuestionHistory.session_id == session_id,
+                QuestionHistory.is_correct.is_(False),
             )
-            .scalars()
-            .all()
         )
 
-    def get_topic_accuracy(
-        self,
-        *,
-        user_id: UUID,
-        study_material_id: UUID,
-        topic: str,
-    ) -> float:
-
-        progress = self.get_topic_progress(
-            user_id=user_id,
-            study_material_id=study_material_id,
-            topic=topic,
+        return list(
+            {
+                topic
+                for topic in self.db.scalars(statement).all()
+            }
         )
-
-        if progress is None:
-
-            return 0.0
-
-        if progress.total_questions == 0:
-
-            return 0.0
-
-        return (
-            progress.correct_answers
-            / progress.total_questions
-        )
-
-    def get_average_accuracy(
-        self,
-        *,
-        user_id: UUID,
-        study_material_id: UUID,
-    ) -> float:
-
-        progress = self.get_progress(
-            user_id=user_id,
-            study_material_id=study_material_id,
-        )
-
-        if progress is None:
-
-            return 0.0
-
-        if progress.total_questions == 0:
-
-            return 0.0
-
-        return (
-            progress.correct_answers
-            / progress.total_questions
-        )
-
-    def get_average_response_time(
-        self,
-        *,
-        user_id: UUID,
-        study_material_id: UUID,
-    ) -> float:
-
-        topics = self.list_topics(
-            user_id=user_id,
-            study_material_id=study_material_id,
-        )
-
-        if not topics:
-
-            return 0.0
-
-        total = sum(
-            topic.average_response_time
-            for topic in topics
-        )
-
-        return total / len(topics)
-
-    def get_recommended_next_topic(
-        self,
-        *,
-        user_id: UUID,
-        study_material_id: UUID,
-    ) -> TopicProgress | None:
-
-        weak = self.get_weak_topics(
-            user_id=user_id,
-            study_material_id=study_material_id,
-        )
-
-        if weak:
-
-            return weak[0]
-
-        topics = self.list_topics(
-            user_id=user_id,
-            study_material_id=study_material_id,
-        )
-
-        if topics:
-
-            return min(
-                topics,
-                key=lambda x: x.mastery_score,
-            )
-
-        return None
-
-    def get_learning_summary(
-        self,
-        *,
-        user_id: UUID,
-        study_material_id: UUID,
-    ) -> dict:
-
-        progress = self.get_progress(
-            user_id=user_id,
-            study_material_id=study_material_id,
-        )
-
-        topics = self.list_topics(
-            user_id=user_id,
-            study_material_id=study_material_id,
-        )
-
-        return {
-            "overall_progress": progress,
-            "topic_count": len(topics),
-            "average_accuracy": self.get_average_accuracy(
-                user_id=user_id,
-                study_material_id=study_material_id,
-            ),
-            "average_response_time": self.get_average_response_time(
-                user_id=user_id,
-                study_material_id=study_material_id,
-            ),
-            "weak_topics": [
-                topic.topic
-                for topic in self.get_weak_topics(
-                    user_id=user_id,
-                    study_material_id=study_material_id,
-                )
-            ],
-            "mastered_topics": [
-                topic.topic
-                for topic in self.get_mastered_topics(
-                    user_id=user_id,
-                    study_material_id=study_material_id,
-                )
-            ],
-        }
 

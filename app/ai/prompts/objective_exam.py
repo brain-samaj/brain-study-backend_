@@ -1,60 +1,64 @@
-from app.ai.analyzers.models import DocumentAnalysis
+from __future__ import annotations
 
 
-def build_objective_prompt(
-    analysis: DocumentAnalysis,
-    material: str,
-    total_questions: int,
-):
+class ObjectiveExamPromptBuilder:
 
-    return f"""
-You are an experienced university examination lecturer.
+    @staticmethod
+    def build(
+        *,
+        subject: str,
+        topic: str,
+        difficulty: str,
+        question_count: int,
+        content: str,
+    ) -> str:
 
-Generate {total_questions} multiple-choice questions.
+        return f"""
+You are an elite examination setter.
 
-Subject
-
-{analysis.subject}
-
-Topic
-
-{analysis.topic}
+Create a professional objective examination.
 
 Rules
 
-Questions must cover the whole material.
+- Return ONLY valid JSON.
+- No markdown.
+- No explanations outside JSON.
+- Every question must have exactly four options.
+- Only one correct answer.
+- Questions must test understanding, not memorization.
+- Include easy, medium and hard questions.
+- Base everything on the supplied material.
 
-Difficulty should gradually increase.
+JSON FORMAT
 
-Never repeat concepts.
+[
+  {{
+    "question":"",
+    "options":[
+      "",
+      "",
+      "",
+      ""
+    ],
+    "correct_answer":"",
+    "explanation":"",
+    "difficulty":"medium"
+  }}
+]
 
-Each question must have
+Subject:
+{subject}
 
-A
+Topic:
+{topic}
 
-B
+Difficulty:
+{difficulty}
 
-C
-
-D
-
-Exactly ONE correct answer.
-
-Include explanation.
-
-Include difficulty.
-
-Include topic.
-
-Calculation questions when necessary.
-
-Programming questions when necessary.
-
-Clinical questions when necessary.
-
-Return ONLY JSON.
+Questions:
+{question_count}
 
 Material
 
-{material}
+{content}
 """
