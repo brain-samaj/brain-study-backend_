@@ -25,6 +25,45 @@ class KnowledgeRepository:
         self.db = db
         self.orchestrator = KnowledgeOrchestrator()
 
+    # -------------------------------------------------
+    # GETTERS
+    # -------------------------------------------------
+
+    def get(
+        self,
+        source_id: UUID,
+    ) -> KnowledgeSource | None:
+
+        return (
+            self.db.query(KnowledgeSource)
+            .filter(
+                KnowledgeSource.id == source_id,
+            )
+            .first()
+        )
+
+    def get_by_study_material(
+        self,
+        study_material_id: UUID,
+    ) -> KnowledgeSource | None:
+        """
+        Returns the processed Knowledge Source
+        created from a Study Material.
+        """
+
+        return (
+            self.db.query(KnowledgeSource)
+            .filter(
+                KnowledgeSource.study_material_id
+                == study_material_id,
+            )
+            .first()
+        )
+
+    # -------------------------------------------------
+    # TOPIC
+    # -------------------------------------------------
+
     async def create_topic(
         self,
         *,
@@ -36,6 +75,7 @@ class KnowledgeRepository:
 
         source = KnowledgeSource(
             user_id=user_id,
+            study_material_id=None,
             title=title,
             subject=subject,
             source_type="topic",
@@ -71,25 +111,35 @@ class KnowledgeRepository:
             source.error_message = str(exc)
 
             self.db.commit()
-
             raise
+
+    # -------------------------------------------------
+    # DOCUMENT
+    # -------------------------------------------------
 
     async def save_document(
         self,
         *,
         user_id: UUID,
+        study_material_id: UUID | None = None,
         file: UploadFile,
     ):
 
-        filename = f"{datetime.utcnow().timestamp()}_{file.filename}"
+        filename = (
+            f"{datetime.utcnow().timestamp()}_{file.filename}"
+        )
 
         destination = UPLOAD_DIRECTORY / filename
 
         with destination.open("wb") as buffer:
-            shutil.copyfileobj(file.file, buffer)
+            shutil.copyfileobj(
+                file.file,
+                buffer,
+            )
 
         source = KnowledgeSource(
             user_id=user_id,
+            study_material_id=study_material_id,
             title=Path(file.filename).stem,
             subject="General",
             source_type=destination.suffix.lower().replace(".", ""),
@@ -127,5 +177,5 @@ class KnowledgeRepository:
             source.error_message = str(exc)
 
             self.db.commit()
-
             raise
+

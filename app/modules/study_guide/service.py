@@ -1,23 +1,29 @@
 from __future__ import annotations
 
-from app.ai.services.orchestrator import AIOrchestrator
+from fastapi import HTTPException
+from fastapi import status
+
+from app.ai.services.teacher import TeacherAI
 from app.modules.knowledge_engine.repository import KnowledgeRepository
 
 
 class StudyGuideService:
     """
-    Service layer responsible for generating study guides.
+    Generates a complete study guide from a Study Material.
 
-    Flow:
-        Router
-          ↓
-        StudyGuideService
-          ↓
-        KnowledgeRepository
-          ↓
-        AIOrchestrator
-          ↓
-        Generated Learning Pack
+    Frontend only sends:
+
+        study_material_id
+
+    Backend automatically:
+
+        Study Material
+            ↓
+        Knowledge Engine
+            ↓
+        Teacher AI
+            ↓
+        Complete Study Guide
     """
 
     def __init__(
@@ -25,29 +31,41 @@ class StudyGuideService:
         repository: KnowledgeRepository,
     ) -> None:
         self.repository = repository
-        self.ai = AIOrchestrator(repository)
+        self.teacher = TeacherAI()
 
     async def generate(
         self,
-        knowledge_source_id,
-        education_level,
+        *,
+        study_material_id,
+        education_level: str,
     ):
-        """
-        Generate a study guide from a knowledge source.
-        """
 
-        source = self.repository.get(
-            knowledge_source_id,
+        source = self.repository.get_by_study_material(
+            study_material_id,
         )
 
         if source is None:
-            raise ValueError(
-                "Knowledge source not found."
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Study material not found.",
             )
 
-        return await self.ai.build_learning_pack(
-            subject=source.subject,
+        if source.processing_status != "completed":
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Study material is still processing.",
+            )
+
+        if not source.cleaned_text:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="No knowledge could be extracted from this material.",
+            )
+
+        return await self.teacher.generate_study_guide(
             title=source.title,
+            subject=source.subject,
             material=source.cleaned_text,
             education_level=education_level,
         )
+

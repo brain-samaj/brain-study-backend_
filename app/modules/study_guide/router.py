@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from fastapi import APIRouter
 from fastapi import Depends
 
@@ -15,13 +17,27 @@ router = APIRouter(
 @router.post("/generate")
 async def generate_study_guide(
     request: GenerateStudyGuideRequest,
-    user=Depends(get_current_user),
+    current_user=Depends(get_current_user),
     repository=Depends(get_repository),
 ):
+    """
+    Generate a complete Study Guide.
 
-    service = StudyGuideService(repository)
+    The frontend never tells the AI how to teach.
+
+    It only supplies the knowledge source.
+
+    Brain Study automatically teaches the topic
+    in the best possible way for the student's
+    education level.
+    """
+
+    service = StudyGuideService(
+        repository=repository,
+    )
 
     return await service.generate(
         knowledge_source_id=request.knowledge_source_id,
-        education_level=user.education_level,
+        education_level=current_user.education_level,
     )
+

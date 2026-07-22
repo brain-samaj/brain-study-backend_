@@ -12,11 +12,21 @@ from sqlalchemy import String
 from sqlalchemy import Text
 from sqlalchemy.orm import Mapped
 from sqlalchemy.orm import mapped_column
+from sqlalchemy.orm import relationship
 
 from app.database.base import BaseModel
 
 
 class KnowledgeSource(BaseModel):
+    """
+    Canonical knowledge extracted from uploaded
+    study materials or typed topics.
+
+    Everything in Brain Study (Study Guide,
+    Smart Study, Flashcards, Exams) is generated
+    from this model.
+    """
+
     __tablename__ = "knowledge_sources"
 
     __table_args__ = (
@@ -29,6 +39,14 @@ class KnowledgeSource(BaseModel):
     user_id: Mapped[UUID] = mapped_column(
         ForeignKey("users.id", ondelete="CASCADE"),
         nullable=False,
+    )
+
+    # Link back to the uploaded Study Material.
+    # Topics created without a file will keep this NULL.
+    study_material_id: Mapped[UUID | None] = mapped_column(
+        ForeignKey("study_materials.id", ondelete="SET NULL"),
+        nullable=True,
+        unique=True,
     )
 
     source_type: Mapped[str] = mapped_column(
@@ -105,6 +123,16 @@ class KnowledgeSource(BaseModel):
         nullable=True,
     )
 
+    study_material = relationship(
+        "StudyMaterial",
+        lazy="joined",
+    )
+
+    owner = relationship(
+        "User",
+        lazy="joined",
+    )
+
     def __repr__(self) -> str:
         return (
             f"<KnowledgeSource("
@@ -114,3 +142,4 @@ class KnowledgeSource(BaseModel):
             f"type='{self.source_type}'"
             f")>"
         )
+
