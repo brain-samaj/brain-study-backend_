@@ -1,23 +1,40 @@
 from __future__ import annotations
 
-from pathlib import Path
-
 from app.ai.extractors.base import BaseExtractor
 from app.ai.extractors.base import ExtractionResult
 
 
 class TopicExtractor(BaseExtractor):
+    SUPPORTED_EXTENSIONS = {".topic"}
 
     def supports(self, suffix: str) -> bool:
-        return suffix == ".topic"
+        return suffix.lower() in self.SUPPORTED_EXTENSIONS
 
-    def extract(self, source: Path) -> ExtractionResult:
+    async def extract(
+        self,
+        *,
+        title: str,
+        subject: str,
+        topic: str,
+    ) -> ExtractionResult:
+        """
+        Extract text from a topic entered directly
+        by the user instead of an uploaded file.
+        """
+
+        text = f"""Title: {title}
+
+Subject: {subject}
+
+{topic}
+"""
+
         return ExtractionResult(
-            text=source.read_text(
-                encoding="utf-8",
-            ).strip(),
+            text=text.strip(),
             page_count=1,
             metadata={
-                "type": "topic"
+                "type": "topic",
+                "title": title,
+                "subject": subject,
             },
         )
