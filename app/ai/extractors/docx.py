@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from pathlib import Path
+
 from docx import Document
 
 from app.ai.extractors.base import BaseExtractor
@@ -7,11 +9,15 @@ from app.ai.extractors.base import ExtractionResult
 
 
 class DocxExtractor(BaseExtractor):
+    SUPPORTED_EXTENSIONS = {".docx"}
 
     def supports(self, suffix: str) -> bool:
-        return suffix == ".docx"
+        return suffix.lower() in self.SUPPORTED_EXTENSIONS
 
-    def extract(self, source) -> ExtractionResult:
+    def extract(
+        self,
+        source: Path,
+    ) -> ExtractionResult:
 
         document = Document(source)
 

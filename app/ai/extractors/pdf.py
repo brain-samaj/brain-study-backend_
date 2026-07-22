@@ -9,11 +9,15 @@ from app.ai.extractors.base import ExtractionResult
 
 
 class PdfExtractor(BaseExtractor):
+    SUPPORTED_EXTENSIONS = {".pdf"}
 
     def supports(self, suffix: str) -> bool:
-        return suffix == ".pdf"
+        return suffix.lower() in self.SUPPORTED_EXTENSIONS
 
-    def extract(self, source: Path) -> ExtractionResult:
+    def extract(
+        self,
+        source: Path,
+    ) -> ExtractionResult:
 
         reader = PdfReader(str(source))
 

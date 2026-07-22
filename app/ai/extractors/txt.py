@@ -7,11 +7,16 @@ from app.ai.extractors.base import ExtractionResult
 
 
 class TxtExtractor(BaseExtractor):
+    SUPPORTED_EXTENSIONS = {".txt"}
 
     def supports(self, suffix: str) -> bool:
-        return suffix == ".txt"
+        return suffix.lower() in self.SUPPORTED_EXTENSIONS
 
-    def extract(self, source: Path) -> ExtractionResult:
+    def extract(
+        self,
+        source: Path,
+    ) -> ExtractionResult:
+
         text = source.read_text(
             encoding="utf-8",
             errors="ignore",
@@ -21,6 +26,6 @@ class TxtExtractor(BaseExtractor):
             text=text.strip(),
             page_count=1,
             metadata={
-                "type": "text"
+                "type": "text",
             },
         )

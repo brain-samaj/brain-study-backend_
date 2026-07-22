@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from pathlib import Path
+
 from PIL import Image
 import pytesseract
 
@@ -8,8 +10,7 @@ from app.ai.extractors.base import ExtractionResult
 
 
 class ImageExtractor(BaseExtractor):
-
-    IMAGE_EXTENSIONS = {
+    SUPPORTED_EXTENSIONS = {
         ".jpg",
         ".jpeg",
         ".png",
@@ -19,9 +20,12 @@ class ImageExtractor(BaseExtractor):
     }
 
     def supports(self, suffix: str) -> bool:
-        return suffix in self.IMAGE_EXTENSIONS
+        return suffix.lower() in self.SUPPORTED_EXTENSIONS
 
-    def extract(self, source) -> ExtractionResult:
+    def extract(
+        self,
+        source: Path,
+    ) -> ExtractionResult:
 
         image = Image.open(source)
 
