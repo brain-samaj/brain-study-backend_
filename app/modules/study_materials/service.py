@@ -66,7 +66,7 @@ class StudyMaterialService:
             stored_filename="topic",
             mime_type="text/plain",
             file_extension=".topic",
-            file_size=len(topic_description.encode()),
+            file_size=len(topic_description.encode("utf-8")),
             storage_path="",
             extracted_text=topic_description.strip(),
             ai_processed=False,
@@ -76,6 +76,7 @@ class StudyMaterialService:
 
         await self.knowledge_repository.create_topic(
             user_id=current_user.id,
+            study_material_id=material.id,
             title=title.strip(),
             subject=subject,
             topic_description=topic_description.strip(),
@@ -216,4 +217,3 @@ class StudyMaterialService:
             path.unlink()
 
         self.repository.delete(material)
-

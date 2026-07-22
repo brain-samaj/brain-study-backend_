@@ -11,7 +11,6 @@ from sqlalchemy.orm import Session
 from app.ai.orchestrator import KnowledgeOrchestrator
 from app.modules.knowledge_engine.models import KnowledgeSource
 
-
 UPLOAD_DIRECTORY = Path("storage/knowledge")
 UPLOAD_DIRECTORY.mkdir(parents=True, exist_ok=True)
 
@@ -46,16 +45,11 @@ class KnowledgeRepository:
         self,
         study_material_id: UUID,
     ) -> KnowledgeSource | None:
-        """
-        Returns the processed Knowledge Source
-        created from a Study Material.
-        """
 
         return (
             self.db.query(KnowledgeSource)
             .filter(
-                KnowledgeSource.study_material_id
-                == study_material_id,
+                KnowledgeSource.study_material_id == study_material_id,
             )
             .first()
         )
@@ -68,6 +62,7 @@ class KnowledgeRepository:
         self,
         *,
         user_id: UUID,
+        study_material_id: UUID | None = None,
         title: str,
         subject: str,
         topic_description: str,
@@ -75,7 +70,7 @@ class KnowledgeRepository:
 
         source = KnowledgeSource(
             user_id=user_id,
-            study_material_id=None,
+            study_material_id=study_material_id,
             title=title,
             subject=subject,
             source_type="topic",
@@ -95,6 +90,7 @@ class KnowledgeRepository:
                 topic=topic_description,
             )
 
+            source.subject = knowledge.subject
             source.raw_text = knowledge.cleaned_text
             source.cleaned_text = knowledge.cleaned_text
             source.processing_status = "completed"
@@ -178,4 +174,3 @@ class KnowledgeRepository:
 
             self.db.commit()
             raise
-
