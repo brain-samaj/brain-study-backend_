@@ -5,12 +5,16 @@ from app.ai.extractors.base import ExtractionResult
 
 
 class TopicExtractor(BaseExtractor):
+
     SUPPORTED_EXTENSIONS = {".topic"}
 
-    def supports(self, suffix: str) -> bool:
+    def supports(
+        self,
+        suffix: str,
+    ) -> bool:
         return suffix.lower() in self.SUPPORTED_EXTENSIONS
 
-    async def extract(
+    def extract(
         self,
         *,
         title: str,
@@ -18,8 +22,8 @@ class TopicExtractor(BaseExtractor):
         topic: str,
     ) -> ExtractionResult:
         """
-        Extract text from a topic entered directly
-        by the user instead of an uploaded file.
+        Converts a manually entered topic into the
+        same format used by uploaded documents.
         """
 
         text = f"""Title: {title}

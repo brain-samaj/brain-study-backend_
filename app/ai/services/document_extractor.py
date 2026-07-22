@@ -18,9 +18,6 @@ class DocumentExtractor:
     • TXT
     • Images (OCR)
     • Topic text
-
-    Every uploaded study material enters the
-    system through this service.
     """
 
     def __init__(self) -> None:
@@ -35,7 +32,8 @@ class DocumentExtractor:
 
         extractor = self.factory.get(path)
 
-        return await extractor.extract(path)
+        # Extractors are synchronous.
+        return extractor.extract(path)
 
     async def extract_topic(
         self,
@@ -46,7 +44,8 @@ class DocumentExtractor:
 
         extractor = self.factory.get_topic()
 
-        return await extractor.extract(
+        # Topic extractor is also synchronous.
+        return extractor.extract(
             title=title,
             subject=subject,
             topic=topic,
