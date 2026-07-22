@@ -13,6 +13,7 @@ from sqlalchemy.orm import Session
 from app.database.session import get_db
 from app.modules.auth.dependencies import get_current_user
 from app.modules.auth.models import User
+from app.modules.knowledge_engine.repository import KnowledgeRepository
 from app.modules.study_materials.repository import StudyMaterialRepository
 from app.modules.study_materials.schemas import (
     DeleteStudyMaterialResponse,
@@ -33,7 +34,28 @@ def get_service(
     db: Session = Depends(get_db),
 ) -> StudyMaterialService:
     return StudyMaterialService(
-        StudyMaterialRepository(db),
+        repository=StudyMaterialRepository(db),
+        knowledge_repository=KnowledgeRepository(db),
+    )
+
+
+@router.post(
+    "/topic",
+    response_model=StudyMaterialResponse,
+    status_code=status.HTTP_201_CREATED,
+)
+async def create_topic(
+    title: str = Form(...),
+    subject: str = Form(...),
+    description: str = Form(...),
+    current_user: User = Depends(get_current_user),
+    service: StudyMaterialService = Depends(get_service),
+):
+    return await service.create_from_topic(
+        current_user=current_user,
+        title=title,
+        subject=subject,
+        topic_description=description,
     )
 
 
@@ -54,7 +76,7 @@ async def upload_study_material(
         description=description,
     )
 
-    return service.upload(
+    return await service.upload(
         current_user=current_user,
         metadata=payload,
         file=file,
