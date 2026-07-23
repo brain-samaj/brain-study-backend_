@@ -3,32 +3,38 @@ from __future__ import annotations
 from functools import lru_cache
 
 from app.ai.providers.base import BaseAIProvider
-from app.ai.providers.groq import GroqProvider
+from app.ai.providers.factory import get_ai_provider
 
 
 @lru_cache(maxsize=1)
 def get_provider() -> BaseAIProvider:
     """
-    Returns the configured language model provider.
+    Returns the configured AI provider.
 
-    Using a singleton avoids recreating the HTTP client
-    for every request.
+    Provider selection and fallback logic
+    are handled by the factory.
     """
-    return GroqProvider()
+
+    return get_ai_provider()
+
 
 
 class AIClient:
     """
-    High-level interface used throughout the backend.
+    High-level AI interface used throughout Brain Study.
 
-    Study Guide
-    Smart Study
-    Flashcards
-    Practice Exam
+    All AI features communicate through this class:
 
-    All communicate through this class rather than
-    talking directly to the provider.
+    - Study Guide
+    - Smart Study
+    - Flashcards
+    - Exams
+    - Document Analysis
+    - Evaluation
+
+    Provider switching is handled automatically.
     """
+
 
     def __init__(
         self,
@@ -36,6 +42,8 @@ class AIClient:
     ) -> None:
 
         self.provider = provider or get_provider()
+
+
 
     async def generate(
         self,
@@ -51,6 +59,8 @@ class AIClient:
             max_tokens=max_tokens,
         )
 
+
+
     async def generate_json(
         self,
         *,
@@ -63,5 +73,19 @@ class AIClient:
             temperature=temperature,
         )
 
+
+
+    async def embeddings(
+        self,
+        texts,
+    ):
+
+        return await self.provider.embeddings(
+            texts
+        )
+
+
+
     async def health(self) -> bool:
+
         return await self.provider.health()
