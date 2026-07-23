@@ -20,10 +20,11 @@ class GeminiProvider(BaseAIProvider):
             )
 
         self.client = genai.Client(
-            api_key=settings.GEMINI_API_KEY,
+            api_key=settings.GEMINI_API_KEY
         )
 
         self.model = settings.GEMINI_MODEL
+
 
 
     async def generate(
@@ -37,12 +38,33 @@ class GeminiProvider(BaseAIProvider):
 
         response = await self.client.aio.models.generate_content(
             model=self.model,
-            contents=prompt,
+            contents=[
+                {
+                    "role": "user",
+                    "parts": [
+                        {
+                            "text": (
+                                "You are Brain Study's educational engine.\n"
+                                "Always follow instructions exactly.\n"
+                                "Never mention AI.\n"
+                                "Never mention language models.\n\n"
+                                f"{prompt}"
+                            )
+                        }
+                    ],
+                }
+            ],
             config={
                 "temperature": temperature,
                 "max_output_tokens": max_tokens,
             },
         )
+
+
+        if not response.text:
+            raise ValueError(
+                "Gemini returned empty response"
+            )
 
 
         return response.text.strip()
@@ -63,6 +85,7 @@ class GeminiProvider(BaseAIProvider):
             + "IMPORTANT:\n"
             + "Return ONLY valid JSON.\n"
             + "Do NOT use markdown.\n"
+            + "Do NOT use ```json.\n"
             + "Do NOT explain anything.\n"
             + "Output must begin with '{' and end with '}'."
         )
@@ -136,7 +159,7 @@ class GeminiProvider(BaseAIProvider):
                 max_tokens=5,
             )
 
-            return result == "OK" or bool(result)
+            return bool(result)
 
 
         except Exception:
