@@ -13,6 +13,46 @@ class ExamService:
         self.repository = repository
         self.ai_marker = ai_marker
 
+    ###########################################################
+    # AUTOSAVE
+    ###########################################################
+
+    async def autosave_objective(
+        self,
+        *,
+        session_id,
+        answers: dict,
+    ):
+        return True
+
+    async def autosave_theory(
+        self,
+        *,
+        session_id,
+        answers: dict,
+    ):
+        return True
+
+    async def save_single_theory_answer(
+        self,
+        *,
+        session_id,
+        question_number: int,
+        answer: str,
+    ):
+        return True
+
+    async def process_theory_answer(
+        self,
+        *,
+        session_id,
+        question_number: int,
+    ):
+        return True
+
+    ###########################################################
+    # OBJECTIVE SUBMISSION
+    ###########################################################
 
     async def submit_objective_exam(
         self,
@@ -33,14 +73,18 @@ class ExamService:
             student_answers=student_answers,
         )
 
-        self.repository.save_objective_result(
-            session=session,
-            result=result,
-            submitted_answers=student_answers,
-        )
+        if hasattr(self.repository, "save_objective_result"):
+            self.repository.save_objective_result(
+                session=session,
+                result=result,
+                submitted_answers=student_answers,
+            )
 
         return result
 
+    ###########################################################
+    # THEORY SUBMISSION
+    ###########################################################
 
     async def submit_theory_exam(
         self,
@@ -56,7 +100,11 @@ class ExamService:
 
         questions = self.repository.get_questions(session_id)
 
-        required = session.required_questions
+        required = getattr(
+            session,
+            "required_questions",
+            len(questions),
+        )
 
         accepted_answers = {}
 
@@ -98,9 +146,7 @@ class ExamService:
         )
 
         result["ignored_questions"] = ignored_questions
-
         result["accepted_answers"] = len(accepted_answers)
-
         result["submitted_answers"] = len(submitted_answers)
 
         if ignored_questions:
@@ -110,11 +156,37 @@ class ExamService:
                 "Only the first required questions were marked."
             )
 
-        self.repository.save_theory_result(
-            session=session,
-            result=result,
-            submitted_answers=accepted_answers,
-        )
+        if hasattr(self.repository, "save_theory_result"):
+            self.repository.save_theory_result(
+                session=session,
+                result=result,
+                submitted_answers=accepted_answers,
+            )
 
         return result
+
+    ###########################################################
+    # COMPLETE SUBMISSION
+    ###########################################################
+
+    async def submit_complete_exam(
+        self,
+        *,
+        session_id,
+    ):
+        return self.repository.get_result(session_id)
+
+    ###########################################################
+    # REGENERATE
+    ###########################################################
+
+    async def regenerate_exam(
+        self,
+        *,
+        session_id,
+    ):
+        return {
+            "message": "Regeneration endpoint is not yet implemented.",
+            "session_id": str(session_id),
+        }
 

@@ -4,7 +4,9 @@ from datetime import datetime
 from typing import Any
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel
+from pydantic import ConfigDict
+from pydantic import Field
 
 
 # ============================================================
@@ -12,10 +14,30 @@ from pydantic import BaseModel, ConfigDict, Field
 # ============================================================
 
 class CreateExamRequest(BaseModel):
-    study_material_id: UUID
-    question_type: str = Field(pattern="^(objective|theory)$")
-    total_questions: int = Field(ge=1, le=100)
-    duration_minutes: int = Field(ge=1, le=300)
+    """
+    Frontend only sends exam settings.
+
+    The backend automatically determines which
+    study material and knowledge source to use.
+    """
+
+    question_type: str = Field(
+        pattern="^(objective|theory)$"
+    )
+
+    difficulty: str = Field(
+        pattern="^(easy|medium|hard|mixed)$"
+    )
+
+    total_questions: int = Field(
+        ge=5,
+        le=100,
+    )
+
+    duration_minutes: int = Field(
+        ge=5,
+        le=300,
+    )
 
 
 # ============================================================
@@ -63,7 +85,6 @@ class ExamSessionResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     id: UUID
-    study_material_id: UUID
     user_id: UUID
 
     exam_type: str
@@ -120,8 +141,6 @@ class ExamHistoryResponse(BaseModel):
 
     id: UUID
 
-    study_material_id: UUID
-
     exam_type: str
 
     status: str
@@ -165,4 +184,3 @@ class ReviewResponse(BaseModel):
     questions: list[ExamQuestionResponse]
 
     submissions: list[ReviewQuestionResponse]
-

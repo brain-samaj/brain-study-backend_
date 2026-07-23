@@ -24,22 +24,28 @@ Rules
 - No markdown.
 - No explanations outside JSON.
 - Questions must require reasoning.
-- Include define, explain, compare, discuss, evaluate, calculate and analyze questions.
-- Cover the entire study material.
-- Questions should progressively increase in difficulty.
+- Cover every important concept from the material.
+- Mix define, explain, compare, discuss, calculate,
+  evaluate and analyze questions.
+- Increase difficulty gradually.
+- Every question must include marking guidance.
 
-JSON FORMAT
+Return ONLY JSON.
 
 [
   {{
     "question":"",
-    "mark":10,
+
+    "marks":10,
+
     "difficulty":"medium",
+
     "expected_points":[
       "",
       "",
       ""
     ],
+
     "sample_answer":""
   }}
 ]
@@ -56,7 +62,7 @@ Difficulty:
 Questions:
 {question_count}
 
-Material
+Material:
 
 {content}
 """
@@ -66,18 +72,14 @@ def build_theory_exam_prompt(
     *,
     analysis,
     material: str,
-    duration: int = 120,
-    answer_any: int = 5,
+    total_questions: int,
+    difficulty: str = "mixed",
 ) -> str:
-    """
-    Backward compatibility wrapper.
-    Existing services use this function name.
-    """
 
     return TheoryExamPromptBuilder.build(
         subject=analysis.subject,
         topic=analysis.topic,
-        duration=duration,
-        answer_any=answer_any,
+        difficulty=difficulty,
+        question_count=total_questions,
         content=material,
     )
