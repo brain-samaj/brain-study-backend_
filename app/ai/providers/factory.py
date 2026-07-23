@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import traceback
+
 from app.ai.providers.base import BaseAIProvider
 from app.ai.providers.groq import GroqProvider
 from app.ai.providers.gemini import GeminiProvider
@@ -10,12 +12,20 @@ from app.core.config import settings
 
 class FallbackAIProvider(BaseAIProvider):
     """
-    Automatically switches between AI providers.
+    Automatic AI provider switching.
 
-    Primary provider is tried first.
-    If it fails, fallback provider is used.
+    Flow:
+
+    Primary:
+        Gemini
+
+    Fallback:
+        Groq
+
+    If primary fails:
+        log error
+        use fallback
     """
-
 
     def __init__(
         self,
@@ -36,7 +46,6 @@ class FallbackAIProvider(BaseAIProvider):
         max_tokens: int = 4096,
     ) -> str:
 
-
         try:
 
             return await self.primary.generate(
@@ -46,12 +55,14 @@ class FallbackAIProvider(BaseAIProvider):
             )
 
 
-        except Exception as primary_error:
+        except Exception as error:
 
             print(
-                "Primary AI failed:",
-                primary_error,
+                "PRIMARY AI GENERATE FAILED:",
+                repr(error),
             )
+
+            traceback.print_exc()
 
 
             return await self.fallback.generate(
@@ -69,7 +80,6 @@ class FallbackAIProvider(BaseAIProvider):
         temperature: float = 0.2,
     ) -> dict:
 
-
         try:
 
             return await self.primary.generate_json(
@@ -78,12 +88,14 @@ class FallbackAIProvider(BaseAIProvider):
             )
 
 
-        except Exception as primary_error:
+        except Exception as error:
 
             print(
-                "Primary AI JSON failed:",
-                primary_error,
+                "PRIMARY AI JSON FAILED:",
+                repr(error),
             )
+
+            traceback.print_exc()
 
 
             return await self.fallback.generate_json(
@@ -108,10 +120,14 @@ class FallbackAIProvider(BaseAIProvider):
         self,
     ) -> bool:
 
-        primary_health = await self.primary.health()
+        try:
 
-        if primary_health:
-            return True
+            if await self.primary.health():
+                return True
+
+        except Exception:
+
+            pass
 
 
         return await self.fallback.health()
@@ -122,7 +138,6 @@ def create_provider(
     name: str,
 ) -> BaseAIProvider:
 
-
     name = name.lower().strip()
 
 
@@ -131,11 +146,9 @@ def create_provider(
         return GeminiProvider()
 
 
-
     if name == "groq":
 
         return GroqProvider()
-
 
 
     raise ValueError(
@@ -145,7 +158,6 @@ def create_provider(
 
 
 def get_ai_provider() -> BaseAIProvider:
-
 
     primary = create_provider(
         settings.PRIMARY_AI_PROVIDER
