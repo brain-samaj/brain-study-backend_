@@ -11,8 +11,7 @@ def get_provider() -> BaseAIProvider:
     """
     Returns the configured AI provider.
 
-    Provider selection and fallback logic
-    are handled by the factory.
+    Uses the automatic primary/fallback system.
     """
 
     return get_ai_provider()
@@ -21,20 +20,10 @@ def get_provider() -> BaseAIProvider:
 
 class AIClient:
     """
-    High-level AI interface used throughout Brain Study.
+    Central AI interface used by Brain Study.
 
-    All AI features communicate through this class:
-
-    - Study Guide
-    - Smart Study
-    - Flashcards
-    - Exams
-    - Document Analysis
-    - Evaluation
-
-    Provider switching is handled automatically.
+    All AI features communicate through this class.
     """
-
 
     def __init__(
         self,
@@ -42,7 +31,6 @@ class AIClient:
     ) -> None:
 
         self.provider = provider or get_provider()
-
 
 
     async def generate(
@@ -60,7 +48,6 @@ class AIClient:
         )
 
 
-
     async def generate_json(
         self,
         *,
@@ -72,18 +59,6 @@ class AIClient:
             prompt=prompt,
             temperature=temperature,
         )
-
-
-
-    async def embeddings(
-        self,
-        texts,
-    ):
-
-        return await self.provider.embeddings(
-            texts
-        )
-
 
 
     async def health(self) -> bool:
