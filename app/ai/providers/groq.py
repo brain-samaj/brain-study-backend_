@@ -12,6 +12,10 @@ from app.core.config import settings
 
 class GroqProvider(BaseAIProvider):
 
+    # Groq TPM limit is 12000 for your current tier.
+    # Keep a safety margin.
+    MAX_PROMPT_CHARS = 30000
+
     def __init__(self) -> None:
 
         self.client = AsyncGroq(
@@ -19,6 +23,22 @@ class GroqProvider(BaseAIProvider):
         )
 
         self.model = settings.GROQ_MODEL
+
+
+    def trim_prompt(
+        self,
+        prompt: str,
+    ) -> str:
+
+        if len(prompt) <= self.MAX_PROMPT_CHARS:
+            return prompt
+
+        return (
+            prompt[:self.MAX_PROMPT_CHARS]
+            +
+            "\n\n[Content shortened because it exceeded AI processing limit.]"
+        )
+
 
     async def generate(
         self,
@@ -28,31 +48,52 @@ class GroqProvider(BaseAIProvider):
         max_tokens: int = 4096,
     ) -> str:
 
+
+        prompt = self.trim_prompt(
+            prompt
+        )
+
+
         response = await self.client.chat.completions.create(
+
             model=self.model,
+
             temperature=temperature,
+
             max_tokens=max_tokens,
+
             messages=[
+
                 {
                     "role": "system",
+
                     "content": (
                         "You are Brain Study's educational engine.\n"
-                        "Always follow the user's instructions exactly.\n"
+                        "Generate clear educational content.\n"
+                        "Follow instructions exactly.\n"
                         "Never wrap JSON inside markdown unless requested."
                     ),
                 },
+
                 {
                     "role": "user",
                     "content": prompt,
                 },
+
             ],
+
         )
 
+
         return (
-            response.choices[0]
-            .message.content
+            response
+            .choices[0]
+            .message
+            .content
             .strip()
         )
+
+
 
     async def generate_json(
         self,
@@ -61,6 +102,12 @@ class GroqProvider(BaseAIProvider):
         temperature: float = 0.2,
     ) -> dict:
 
+
+        prompt = self.trim_prompt(
+            prompt
+        )
+
+
         prompt = (
             prompt
             + "\n\n"
@@ -68,18 +115,19 @@ class GroqProvider(BaseAIProvider):
             + "Return ONLY valid JSON.\n"
             + "Do NOT use markdown.\n"
             + "Do NOT use ```json.\n"
-            + "Do NOT explain anything.\n"
             + "Output must begin with '{' and end with '}'."
         )
+
 
         result = await self.generate(
             prompt=prompt,
             temperature=temperature,
         )
 
+
         result = result.strip()
 
-        # Remove markdown fences if Groq ignores instructions.
+
         result = re.sub(
             r"^```(?:json)?",
             "",
@@ -87,27 +135,35 @@ class GroqProvider(BaseAIProvider):
             flags=re.IGNORECASE,
         )
 
+
         result = re.sub(
             r"```$",
             "",
             result,
         ).strip()
 
-        # Extract the JSON object if extra text exists.
+
         start = result.find("{")
         end = result.rfind("}")
 
+
         if start != -1 and end != -1:
-            result = result[start : end + 1]
+
+            result = result[start:end + 1]
+
 
         try:
+
             return json.loads(result)
+
 
         except json.JSONDecodeError as exc:
 
             raise ValueError(
                 f"Groq returned invalid JSON:\n\n{result}"
             ) from exc
+
+
 
     async def embeddings(
         self,
@@ -117,6 +173,8 @@ class GroqProvider(BaseAIProvider):
         raise NotImplementedError(
             "Groq currently does not provide embeddings."
         )
+
+
 
     async def health(
         self,
@@ -130,6 +188,7 @@ class GroqProvider(BaseAIProvider):
             )
 
             return True
+
 
         except Exception:
 
