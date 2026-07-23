@@ -12,9 +12,10 @@ from app.core.config import settings
 
 class GroqProvider(BaseAIProvider):
 
-    # Groq TPM limit is 12000 for your current tier.
-    # Keep a safety margin.
-    MAX_PROMPT_CHARS = 30000
+    # Keep below Groq free/on-demand TPM limits
+    # Approximation: 1 token ≈ 4 characters
+    MAX_PROMPT_CHARS = 16000
+
 
     def __init__(self) -> None:
 
@@ -25,19 +26,24 @@ class GroqProvider(BaseAIProvider):
         self.model = settings.GROQ_MODEL
 
 
+
     def trim_prompt(
         self,
         prompt: str,
     ) -> str:
 
         if len(prompt) <= self.MAX_PROMPT_CHARS:
+
             return prompt
+
 
         return (
             prompt[:self.MAX_PROMPT_CHARS]
             +
-            "\n\n[Content shortened because it exceeded AI processing limit.]"
+            "\n\n"
+            "[Content shortened to fit processing limits.]"
         )
+
 
 
     async def generate(
@@ -45,11 +51,11 @@ class GroqProvider(BaseAIProvider):
         *,
         prompt: str,
         temperature: float = 0.2,
-        max_tokens: int = 4096,
+        max_tokens: int = 2048,
     ) -> str:
 
 
-        prompt = self.trim_prompt(
+        safe_prompt = self.trim_prompt(
             prompt
         )
 
@@ -66,18 +72,17 @@ class GroqProvider(BaseAIProvider):
 
                 {
                     "role": "system",
-
                     "content": (
                         "You are Brain Study's educational engine.\n"
-                        "Generate clear educational content.\n"
+                        "Create accurate and structured learning content.\n"
                         "Follow instructions exactly.\n"
-                        "Never wrap JSON inside markdown unless requested."
+                        "Never add unnecessary explanations."
                     ),
                 },
 
                 {
                     "role": "user",
-                    "content": prompt,
+                    "content": safe_prompt,
                 },
 
             ],
@@ -103,31 +108,34 @@ class GroqProvider(BaseAIProvider):
     ) -> dict:
 
 
-        prompt = self.trim_prompt(
+        safe_prompt = self.trim_prompt(
             prompt
         )
 
 
-        prompt = (
-            prompt
-            + "\n\n"
-            + "IMPORTANT:\n"
-            + "Return ONLY valid JSON.\n"
-            + "Do NOT use markdown.\n"
-            + "Do NOT use ```json.\n"
-            + "Output must begin with '{' and end with '}'."
+        safe_prompt += (
+
+            "\n\nIMPORTANT:\n"
+            "Return ONLY valid JSON.\n"
+            "Do NOT use markdown.\n"
+            "Do NOT use ```json.\n"
+            "Do not include explanations.\n"
+            "Output must begin with '{' and end with '}'."
+
         )
 
 
         result = await self.generate(
-            prompt=prompt,
+            prompt=safe_prompt,
             temperature=temperature,
+            max_tokens=2048,
         )
 
 
         result = result.strip()
 
 
+        # Remove markdown if model ignores instructions
         result = re.sub(
             r"^```(?:json)?",
             "",
@@ -143,13 +151,16 @@ class GroqProvider(BaseAIProvider):
         ).strip()
 
 
+
         start = result.find("{")
+
         end = result.rfind("}")
 
 
         if start != -1 and end != -1:
 
             result = result[start:end + 1]
+
 
 
         try:
