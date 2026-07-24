@@ -91,6 +91,14 @@ class ExamSession(Base):
         index=True,
     )
 
+owner = relationship(
+    "User",
+)
+
+study_material = relationship(
+    "StudyMaterial",
+    back_populates="exam_sessions",
+)
 
     exam_type: Mapped[ExamType] = mapped_column(
         SqlEnum(ExamType),
