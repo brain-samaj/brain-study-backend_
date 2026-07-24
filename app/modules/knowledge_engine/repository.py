@@ -1,176 +1,176 @@
 from __future__ import annotations
 
-import shutil
-from datetime import datetime
-from pathlib import Path
 from uuid import UUID
 
-from fastapi import UploadFile
-from sqlalchemy.orm import Session
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.ai.orchestrator import KnowledgeOrchestrator
 from app.modules.knowledge_engine.models import KnowledgeSource
-
-UPLOAD_DIRECTORY = Path("storage/knowledge")
-UPLOAD_DIRECTORY.mkdir(parents=True, exist_ok=True)
+from app.modules.knowledge_engine.models import KnowledgeStatus
+from app.modules.knowledge_engine.schemas import KnowledgeCreate
+from app.modules.knowledge_engine.schemas import KnowledgeUpdate
 
 
 class KnowledgeRepository:
+    """
+    Repository responsible ONLY for database access.
 
-    def __init__(
+    No AI.
+    No business logic.
+    No validation.
+    """
+
+    def __init__(self, db: AsyncSession) -> None:
+        self._db = db
+
+    async def create(
         self,
-        db: Session,
-    ):
-        self.db = db
-        self.orchestrator = KnowledgeOrchestrator()
+        data: KnowledgeCreate,
+    ) -> KnowledgeSource:
+        knowledge = KnowledgeSource(
+            material_id=data.material_id,
+            title=data.title,
+            summary=data.summary,
+            knowledge=data.knowledge,
+            topics=[item.model_dump() for item in data.topics],
+            glossary=[item.model_dump() for item in data.glossary],
+            learning_objectives=[
+                item.model_dump()
+                for item in data.learning_objectives
+            ],
+            key_points=data.key_points,
+            sample_questions=[
+                item.model_dump()
+                for item in data.sample_questions
+            ],
+            total_tokens=data.total_tokens,
+            ai_provider=data.ai_provider,
+            ai_model=data.ai_model,
+            processing_time_ms=data.processing_time_ms,
+            is_cached=data.is_cached,
+            status=KnowledgeStatus.READY,
+        )
 
-    # -------------------------------------------------
-    # GETTERS
-    # -------------------------------------------------
+        self._db.add(knowledge)
 
-    def get(
+        await self._db.commit()
+
+        await self._db.refresh(knowledge)
+
+        return knowledge
+
+    async def get(
         self,
-        source_id: UUID,
+        knowledge_id: UUID,
+    ) -> KnowledgeSource | None:
+        result = await self._db.execute(
+            select(KnowledgeSource).where(
+                KnowledgeSource.id == knowledge_id,
+            )
+        )
+
+        return result.scalar_one_or_none()
+
+    async def get_by_material(
+        self,
+        material_id: UUID,
+    ) -> KnowledgeSource | None:
+        result = await self._db.execute(
+            select(KnowledgeSource).where(
+                KnowledgeSource.material_id == material_id,
+            )
+        )
+
+        return result.scalar_one_or_none()
+
+    async def exists(
+        self,
+        material_id: UUID,
+    ) -> bool:
+        return (
+            await self.get_by_material(material_id)
+        ) is not None
+
+    async def update(
+        self,
+        knowledge: KnowledgeSource,
+        data: KnowledgeUpdate,
+    ) -> KnowledgeSource:
+
+        updates = data.model_dump(
+            exclude_none=True,
+        )
+
+        for key, value in updates.items():
+
+            if key in {
+                "topics",
+                "glossary",
+                "learning_objectives",
+                "sample_questions",
+            }:
+                value = [
+                    item.model_dump()
+                    if hasattr(item, "model_dump")
+                    else item
+                    for item in value
+                ]
+
+            setattr(
+                knowledge,
+                key,
+                value,
+            )
+
+        await self._db.commit()
+
+        await self._db.refresh(
+            knowledge,
+        )
+
+        return knowledge
+
+    async def update_status(
+        self,
+        material_id: UUID,
+        status: KnowledgeStatus,
+        error_message: str | None = None,
     ) -> KnowledgeSource | None:
 
-        return (
-            self.db.query(KnowledgeSource)
-            .filter(
-                KnowledgeSource.id == source_id,
-            )
-            .first()
+        knowledge = await self.get_by_material(
+            material_id,
         )
 
-    def get_by_study_material(
+        if knowledge is None:
+            return None
+
+        knowledge.status = status
+        knowledge.error_message = error_message
+
+        await self._db.commit()
+
+        await self._db.refresh(
+            knowledge,
+        )
+
+        return knowledge
+
+    async def delete(
         self,
-        study_material_id: UUID,
-    ) -> KnowledgeSource | None:
+        material_id: UUID,
+    ) -> bool:
 
-        return (
-            self.db.query(KnowledgeSource)
-            .filter(
-                KnowledgeSource.study_material_id == study_material_id,
-            )
-            .first()
+        knowledge = await self.get_by_material(
+            material_id,
         )
 
-    # -------------------------------------------------
-    # TOPIC
-    # -------------------------------------------------
+        if knowledge is None:
+            return False
 
-    async def create_topic(
-        self,
-        *,
-        user_id: UUID,
-        study_material_id: UUID | None = None,
-        title: str,
-        subject: str,
-        topic_description: str,
-    ):
-
-        source = KnowledgeSource(
-            user_id=user_id,
-            study_material_id=study_material_id,
-            title=title,
-            subject=subject,
-            source_type="topic",
-            description=topic_description,
-            processing_status="processing",
+        await self._db.delete(
+            knowledge,
         )
 
-        self.db.add(source)
-        self.db.commit()
-        self.db.refresh(source)
+        await self._db.commit()
 
-        try:
-
-            knowledge = await self.orchestrator.process_topic(
-                title=title,
-                subject=subject,
-                topic=topic_description,
-            )
-
-            source.subject = knowledge.subject
-            source.raw_text = knowledge.cleaned_text
-            source.cleaned_text = knowledge.cleaned_text
-            source.processing_status = "completed"
-            source.processed_at = datetime.utcnow()
-
-            self.db.commit()
-            self.db.refresh(source)
-
-            return source
-
-        except Exception as exc:
-
-            source.processing_status = "failed"
-            source.error_message = str(exc)
-
-            self.db.commit()
-            raise
-
-    # -------------------------------------------------
-    # DOCUMENT
-    # -------------------------------------------------
-
-    async def save_document(
-        self,
-        *,
-        user_id: UUID,
-        study_material_id: UUID | None = None,
-        file: UploadFile,
-    ):
-
-        filename = (
-            f"{datetime.utcnow().timestamp()}_{file.filename}"
-        )
-
-        destination = UPLOAD_DIRECTORY / filename
-
-        with destination.open("wb") as buffer:
-            shutil.copyfileobj(
-                file.file,
-                buffer,
-            )
-
-        source = KnowledgeSource(
-            user_id=user_id,
-            study_material_id=study_material_id,
-            title=Path(file.filename).stem,
-            subject="General",
-            source_type=destination.suffix.lower().replace(".", ""),
-            file_name=file.filename,
-            file_path=str(destination),
-            mime_type=file.content_type,
-            file_size=destination.stat().st_size,
-            processing_status="processing",
-        )
-
-        self.db.add(source)
-        self.db.commit()
-        self.db.refresh(source)
-
-        try:
-
-            knowledge = await self.orchestrator.process_file(
-                destination,
-            )
-
-            source.subject = knowledge.subject
-            source.raw_text = knowledge.cleaned_text
-            source.cleaned_text = knowledge.cleaned_text
-            source.processing_status = "completed"
-            source.processed_at = datetime.utcnow()
-
-            self.db.commit()
-            self.db.refresh(source)
-
-            return source
-
-        except Exception as exc:
-
-            source.processing_status = "failed"
-            source.error_message = str(exc)
-
-            self.db.commit()
-            raise
+        return True

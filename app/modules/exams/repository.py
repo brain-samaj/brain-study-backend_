@@ -3,8 +3,10 @@ from __future__ import annotations
 from uuid import UUID
 
 from sqlalchemy import select
-from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
 
+from app.modules.exams.models import ExamAnswer
 from app.modules.exams.models import ExamQuestion
 from app.modules.exams.models import ExamSession
 from app.modules.exams.result_models import ExamResult
@@ -12,245 +14,295 @@ from app.modules.exams.submission_models import ExamSubmission
 
 
 class ExamRepository:
+    """
+    Async repository layer for Exam module.
+
+    Responsibilities
+    ----------------
+    - Database access only.
+    - No business logic.
+    - No AI logic.
+    - No validation logic.
+
+    Service layer decides what should happen.
+    Repository only communicates with PostgreSQL.
+    """
 
     def __init__(
         self,
-        db: Session,
-    ):
-        self.db = db
+        session: AsyncSession,
+    ) -> None:
 
-    ####################################################
+        self.session = session
+
+
+    # ========================================================
     # SESSION
-    ####################################################
+    # ========================================================
 
-    def create_session(
-        self,
-        session: ExamSession,
-    ) -> ExamSession:
-
-        self.db.add(session)
-        self.db.commit()
-        self.db.refresh(session)
-
-        return session
-
-    def get_session(
+    async def get_session(
         self,
         session_id: UUID,
     ) -> ExamSession | None:
 
-        return self.db.get(
-            ExamSession,
-            session_id,
+        result = await self.session.execute(
+            select(
+                ExamSession
+            )
+            .options(
+                selectinload(
+                    ExamSession.questions
+                ),
+                selectinload(
+                    ExamSession.answers
+                ),
+            )
+            .where(
+                ExamSession.id == session_id
+            )
         )
 
-    def update_session(
+        return result.scalar_one_or_none()
+
+
+
+    async def create_session(
         self,
-        session: ExamSession,
+        exam_session: ExamSession,
     ) -> ExamSession:
 
-        self.db.add(session)
-        self.db.commit()
-        self.db.refresh(session)
-
-        return session
-
-    ####################################################
-    # QUESTIONS
-    ####################################################
-
-    def create_questions(
-        self,
-        questions: list[ExamQuestion],
-    ) -> None:
-
-        self.db.add_all(questions)
-        self.db.commit()
-
-    def get_questions(
-        self,
-        session_id: UUID,
-    ) -> list[ExamQuestion]:
-
-        return (
-            self.db.execute(
-                select(ExamQuestion)
-                .where(
-                    ExamQuestion.session_id == session_id,
-                )
-                .order_by(
-                    ExamQuestion.question_number,
-                )
-            )
-            .scalars()
-            .all()
+        self.session.add(
+            exam_session
         )
 
-    ####################################################
-    # SUBMISSIONS
-    ####################################################
+        await self.session.flush()
 
-    def save_submission(
+        return exam_session
+
+
+
+    async def update_session(
         self,
-        submission: ExamSubmission,
-    ) -> ExamSubmission:
+        exam_session: ExamSession,
+    ) -> ExamSession:
 
-        self.db.add(submission)
-        self.db.commit()
-        self.db.refresh(submission)
+        self.session.add(
+            exam_session
+        )
 
-        return submission
+        await self.session.flush()
 
-    def save_submissions(
+        return exam_session
+
+
+
+    # ========================================================
+    # QUESTIONS
+    # ========================================================
+
+
+    async def create_question(
         self,
-        submissions: list[ExamSubmission],
-    ) -> None:
+        question: ExamQuestion,
+    ) -> ExamQuestion:
 
-        self.db.add_all(submissions)
-        self.db.commit()
+        self.session.add(
+            question
+        )
 
-    def get_submission(
+        await self.session.flush()
+
+        return question
+
+
+
+    async def get_question(
         self,
+        question_id: UUID,
+    ) -> ExamQuestion | None:
+
+        result = await self.session.execute(
+            select(
+                ExamQuestion
+            )
+            .where(
+                ExamQuestion.id == question_id
+            )
+        )
+
+        return result.scalar_one_or_none()
+
+
+
+    # ========================================================
+    # ANSWERS
+    # ========================================================
+
+
+    async def get_answer(
+        self,
+        *,
         session_id: UUID,
         question_id: UUID,
-    ) -> ExamSubmission | None:
+    ) -> ExamAnswer | None:
 
-        return (
-            self.db.execute(
-                select(ExamSubmission).where(
-                    ExamSubmission.session_id == session_id,
-                    ExamSubmission.question_id == question_id,
+        result = await self.session.execute(
+            select(
+                ExamAnswer
+            )
+            .options(
+                selectinload(
+                    ExamAnswer.attachments
                 )
             )
-            .scalars()
-            .first()
+            .where(
+                ExamAnswer.session_id
+                ==
+                session_id
+            )
+            .where(
+                ExamAnswer.question_id
+                ==
+                question_id
+            )
         )
 
-    def get_session_submissions(
+        return result.scalar_one_or_none()
+
+
+
+    async def create_answer(
+        self,
+        *,
+        session_id: UUID,
+        question_id: UUID,
+    ) -> ExamAnswer:
+
+        answer = ExamAnswer(
+            session_id=session_id,
+            question_id=question_id,
+        )
+
+        self.session.add(
+            answer
+        )
+
+        await self.session.flush()
+
+        return answer
+
+
+
+    async def update_answer(
+        self,
+        answer: ExamAnswer,
+    ) -> ExamAnswer:
+
+        self.session.add(
+            answer
+        )
+
+        await self.session.flush()
+
+        return answer
+
+
+
+    # ========================================================
+    # SUBMISSIONS
+    # ========================================================
+
+
+    async def create_submission(
+        self,
+        submission: ExamSubmission,
+    ) -> ExamSubmission:
+
+        self.session.add(
+            submission
+        )
+
+        await self.session.flush()
+
+        return submission
+
+
+
+    async def get_submission(
         self,
         session_id: UUID,
-    ) -> list[ExamSubmission]:
+    ) -> ExamSubmission | None:
 
-        return (
-            self.db.execute(
-                select(ExamSubmission)
-                .where(
-                    ExamSubmission.session_id == session_id,
-                )
-                .order_by(
-                    ExamSubmission.question_number,
-                )
+        result = await self.session.execute(
+            select(
+                ExamSubmission
             )
-            .scalars()
-            .all()
+            .where(
+                ExamSubmission.session_id
+                ==
+                session_id
+            )
         )
 
-    def update_submission(
-        self,
-        submission: ExamSubmission,
-    ) -> ExamSubmission:
+        return result.scalar_one_or_none()
 
-        self.db.add(submission)
-        self.db.commit()
-        self.db.refresh(submission)
 
-        return submission
 
-    ####################################################
-    # MARKING
-    ####################################################
+    # ========================================================
+    # RESULTS
+    # ========================================================
 
-    def save_marking(
-        self,
-        submission: ExamSubmission,
-        *,
-        awarded_marks: float,
-        ai_feedback: dict,
-    ) -> ExamSubmission:
 
-        submission.awarded_marks = awarded_marks
-        submission.ai_feedback = ai_feedback
-        submission.is_marked = True
-
-        self.db.add(submission)
-        self.db.commit()
-        self.db.refresh(submission)
-
-        return submission
-
-    ####################################################
-    # FINAL RESULT
-    ####################################################
-
-    def save_result(
+    async def create_result(
         self,
         result: ExamResult,
     ) -> ExamResult:
 
-        self.db.add(result)
-        self.db.commit()
-        self.db.refresh(result)
+        self.session.add(
+            result
+        )
+
+        await self.session.flush()
 
         return result
 
-    def update_result(
-        self,
-        result: ExamResult,
-    ) -> ExamResult:
 
-        self.db.add(result)
-        self.db.commit()
-        self.db.refresh(result)
 
-        return result
-
-    def get_result(
+    async def get_result(
         self,
         session_id: UUID,
     ) -> ExamResult | None:
 
-        return (
-            self.db.execute(
-                select(ExamResult).where(
-                    ExamResult.session_id == session_id,
-                )
+        result = await self.session.execute(
+            select(
+                ExamResult
             )
-            .scalars()
-            .first()
+            .where(
+                ExamResult.session_id
+                ==
+                session_id
+            )
         )
 
-    ####################################################
-    # HISTORY
-    ####################################################
+        return result.scalar_one_or_none()
 
-    def get_user_exam_history(
+
+
+    # ========================================================
+    # TRANSACTION
+    # ========================================================
+
+
+    async def commit(
         self,
-        user_id: UUID,
-    ) -> list[ExamSession]:
-
-        return (
-            self.db.execute(
-                select(ExamSession)
-                .where(
-                    ExamSession.user_id == user_id,
-                )
-                .order_by(
-                    ExamSession.created_at.desc(),
-                )
-            )
-            .scalars()
-            .all()
-        )
-
-    ####################################################
-    # DELETE
-    ####################################################
-
-    def delete_session(
-        self,
-        session: ExamSession,
     ) -> None:
 
-        self.db.delete(session)
-        self.db.commit()
+        await self.session.commit()
 
+
+
+    async def rollback(
+        self,
+    ) -> None:
+
+        await self.session.rollback()

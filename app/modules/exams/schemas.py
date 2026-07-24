@@ -1,186 +1,193 @@
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Any
 from uuid import UUID
 
 from pydantic import BaseModel
 from pydantic import ConfigDict
 from pydantic import Field
 
+from app.modules.exams.models import ExamDifficulty
+from app.modules.exams.models import ExamType
+
 
 # ============================================================
 # CREATE EXAM
 # ============================================================
 
+
 class CreateExamRequest(BaseModel):
-    """
-    Frontend only sends exam settings.
 
-    The backend automatically determines which
-    study material and knowledge source to use.
-    """
-
-    question_type: str = Field(
-        pattern="^(objective|theory)$"
+    model_config = ConfigDict(
+        use_enum_values=True,
     )
 
-    difficulty: str = Field(
-        pattern="^(easy|medium|hard|mixed)$"
-    )
 
-    total_questions: int = Field(
-        ge=5,
+    exam_type: ExamType
+
+    difficulty: ExamDifficulty
+
+    question_count: int = Field(
+        ge=1,
         le=100,
     )
 
     duration_minutes: int = Field(
-        ge=5,
+        ge=1,
         le=300,
     )
 
 
-# ============================================================
-# OBJECTIVE SUBMISSION
-# ============================================================
-
-class SubmitObjectiveRequest(BaseModel):
-    answers: dict[str, Any]
-
 
 # ============================================================
-# THEORY SUBMISSION
+# ANSWER PAYLOADS
 # ============================================================
 
-class SubmitTheoryRequest(BaseModel):
-    answers: dict[str, str]
+
+class ObjectiveAnswerRequest(BaseModel):
+
+    selected_option: str = Field(
+        min_length=1,
+        max_length=1,
+    )
+
+
+
+class TheoryAnswerRequest(BaseModel):
+
+    text_answer: str = Field(
+        max_length=50000,
+    )
+
 
 
 # ============================================================
-# QUESTION
+# QUESTION RESPONSE
 # ============================================================
+
 
 class ExamQuestionResponse(BaseModel):
 
-    model_config = ConfigDict(from_attributes=True)
+    model_config = ConfigDict(
+        from_attributes=True,
+    )
+
 
     id: UUID
+
     question_number: int
+
     question_type: str
-    topic: str
-    difficulty: str
-    instruction: str | None
+
     question: str
-    sub_questions: dict | None
-    options: dict | None
+
+    topic: str
+
+    difficulty: str
+
     marks: int
 
+    options: list[str]
+
+    instructions: str | None = None
+
+
 
 # ============================================================
-# SESSION
+# SESSION RESPONSE
 # ============================================================
+
 
 class ExamSessionResponse(BaseModel):
 
-    model_config = ConfigDict(from_attributes=True)
+    model_config = ConfigDict(
+        from_attributes=True,
+    )
+
 
     id: UUID
-    user_id: UUID
+
+    material_id: UUID
 
     exam_type: str
 
-    total_questions: int
-
-    duration_minutes: int
+    difficulty: str
 
     status: str
 
-    started_at: datetime | None
+    total_questions: int
 
-    submitted_at: datetime | None
+    total_marks: int
 
-    created_at: datetime
+    duration_minutes: int
+
+    started_at: datetime | None = None
+
+    expires_at: datetime | None = None
+
+    questions: list[
+        ExamQuestionResponse
+    ] = []
+
 
 
 # ============================================================
-# RESULT
+# RESULT RESPONSE
 # ============================================================
+
 
 class ExamResultResponse(BaseModel):
 
-    model_config = ConfigDict(from_attributes=True)
+    model_config = ConfigDict(
+        from_attributes=True,
+    )
 
-    score: float
-
-    total_marks: float
-
-    percentage: float
-
-    grade: str
-
-    passed: bool
-
-    answered_questions: int
-
-    unanswered_questions: int
-
-    total_questions: int
-
-    duration_seconds: int
-
-    grading_summary: dict
-
-
-# ============================================================
-# HISTORY
-# ============================================================
-
-class ExamHistoryResponse(BaseModel):
-
-    model_config = ConfigDict(from_attributes=True)
 
     id: UUID
 
-    exam_type: str
+    score: int
 
-    status: str
+    total_marks: int
 
-    total_questions: int
+    percentage: float
 
-    duration_minutes: int
+    objective_score: int
 
-    created_at: datetime
+    theory_score: int
 
-    submitted_at: datetime | None
+    correct_answers: int
+
+    incorrect_answers: int
+
+    unanswered_questions: int
+
+    strengths: list[str]
+
+    weaknesses: list[str]
+
+    recommendations: list[str]
+
+    ai_summary: str | None = None
+
 
 
 # ============================================================
-# REVIEW
+# TIMER RESPONSE
 # ============================================================
 
-class ReviewQuestionResponse(BaseModel):
 
-    question_number: int
+class ExamTimerResponse(BaseModel):
 
-    question: str
+    started_at: datetime | None
 
-    student_answer: str | None
+    expires_at: datetime | None
 
-    correct_answer: Any | None
+    server_time: datetime
 
-    awarded_marks: float
+    remaining_seconds: int
 
-    max_marks: float
+    elapsed_seconds: int
 
-    feedback: dict | None
+    progress_percent: float
 
-
-class ReviewResponse(BaseModel):
-
-    session: ExamSessionResponse
-
-    result: ExamResultResponse
-
-    questions: list[ExamQuestionResponse]
-
-    submissions: list[ReviewQuestionResponse]
+    expired: bool

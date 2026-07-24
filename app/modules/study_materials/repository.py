@@ -4,129 +4,205 @@ from uuid import UUID
 
 from sqlalchemy import func
 from sqlalchemy import select
-from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.modules.study_materials.models import ProcessingStatus
 from app.modules.study_materials.models import StudyMaterial
+from app.modules.study_materials.schemas import StudyMaterialCreate
+from app.modules.study_materials.schemas import StudyMaterialUpdate
 
 
 class StudyMaterialRepository:
     """
-    Repository responsible for all persistence operations
-    related to study materials.
+    Repository responsible ONLY for StudyMaterial persistence.
+
+    Responsibilities
+    ----------------
+    - CRUD operations
+    - Search
+    - Ownership lookups
+    - Status updates
+
+    No business logic.
+    No AI.
+    No file extraction.
     """
 
-    def __init__(self, db: Session):
-        self.db = db
-
-    def create(
+    def __init__(
         self,
-        material: StudyMaterial,
+        db: AsyncSession,
+    ) -> None:
+        self._db = db
+
+    async def create(
+        self,
+        *,
+        owner_id: UUID,
+        data: StudyMaterialCreate,
     ) -> StudyMaterial:
-        self.db.add(material)
-        self.db.commit()
-        self.db.refresh(material)
+
+        material = StudyMaterial(
+            owner_id=owner_id,
+            title=data.title,
+            description=data.description,
+            original_filename=data.original_filename,
+            stored_filename=data.stored_filename,
+            storage_path=data.storage_path,
+            file_type=data.file_type,
+            mime_type=data.mime_type,
+            file_size=data.file_size,
+            extracted_text=data.extracted_text,
+            page_count=data.page_count,
+            word_count=data.word_count,
+            processing_status=ProcessingStatus.UPLOADING,
+        )
+
+        self._db.add(material)
+
+        await self._db.commit()
+
+        await self._db.refresh(material)
+
         return material
 
-    def get_by_id(
+    async def get(
         self,
         material_id: UUID,
     ) -> StudyMaterial | None:
-        stmt = (
-            select(StudyMaterial)
-            .where(
+
+        result = await self._db.execute(
+            select(StudyMaterial).where(
                 StudyMaterial.id == material_id,
-                StudyMaterial.deleted_at.is_(None),
             )
         )
-        return self.db.scalar(stmt)
 
-    def get_by_user(
+        return result.scalar_one_or_none()
+
+    async def get_for_owner(
         self,
+        *,
         material_id: UUID,
-        user_id: UUID,
+        owner_id: UUID,
     ) -> StudyMaterial | None:
-        stmt = (
-            select(StudyMaterial)
-            .where(
+
+        result = await self._db.execute(
+            select(StudyMaterial).where(
                 StudyMaterial.id == material_id,
-                StudyMaterial.user_id == user_id,
-                StudyMaterial.deleted_at.is_(None),
+                StudyMaterial.owner_id == owner_id,
             )
         )
-        return self.db.scalar(stmt)
 
-    def list_by_user(
+        return result.scalar_one_or_none()
+
+    async def list_for_owner(
         self,
-        user_id: UUID,
+        *,
+        owner_id: UUID,
         skip: int = 0,
         limit: int = 20,
     ) -> list[StudyMaterial]:
-        stmt = (
+
+        result = await self._db.execute(
             select(StudyMaterial)
             .where(
-                StudyMaterial.user_id == user_id,
-                StudyMaterial.deleted_at.is_(None),
+                StudyMaterial.owner_id == owner_id,
+                StudyMaterial.is_archived.is_(False),
             )
-            .order_by(StudyMaterial.created_at.desc())
+            .order_by(
+                StudyMaterial.created_at.desc(),
+            )
             .offset(skip)
             .limit(limit)
         )
 
-        return list(self.db.scalars(stmt).all())
+        return list(result.scalars().all())
 
-    def count_by_user(
+    async def count_for_owner(
         self,
-        user_id: UUID,
+        owner_id: UUID,
     ) -> int:
-        stmt = (
+
+        result = await self._db.execute(
             select(func.count())
             .select_from(StudyMaterial)
             .where(
-                StudyMaterial.user_id == user_id,
-                StudyMaterial.deleted_at.is_(None),
+                StudyMaterial.owner_id == owner_id,
+                StudyMaterial.is_archived.is_(False),
             )
         )
 
-        return int(self.db.scalar(stmt) or 0)
+        return int(result.scalar_one())
 
-    def update(
+    async def update(
         self,
         material: StudyMaterial,
+        payload: StudyMaterialUpdate,
     ) -> StudyMaterial:
-        self.db.add(material)
-        self.db.commit()
-        self.db.refresh(material)
-        return material
 
-    def delete(
-        self,
-        material: StudyMaterial,
-    ) -> None:
-        self.db.delete(material)
-        self.db.commit()
+        updates = payload.model_dump(
+            exclude_none=True,
+        )
 
-    def soft_delete(
-        self,
-        material: StudyMaterial,
-    ) -> StudyMaterial:
-        material.deleted_at = func.now()
+        for field, value in updates.items():
+            setattr(
+                material,
+                field,
+                value,
+            )
 
-        self.db.add(material)
-        self.db.commit()
-        self.db.refresh(material)
+        await self._db.commit()
+
+        await self._db.refresh(material)
 
         return material
 
-    def exists(
+    async def update_processing_status(
+        self,
+        *,
+        material_id: UUID,
+        status: ProcessingStatus,
+        extraction_error: str | None = None,
+    ) -> StudyMaterial | None:
+
+        material = await self.get(
+            material_id,
+        )
+
+        if material is None:
+            return None
+
+        material.processing_status = status
+        material.extraction_error = extraction_error
+
+        await self._db.commit()
+
+        await self._db.refresh(material)
+
+        return material
+
+    async def archive(
         self,
         material_id: UUID,
     ) -> bool:
-        stmt = (
-            select(StudyMaterial.id)
-            .where(
-                StudyMaterial.id == material_id,
-                StudyMaterial.deleted_at.is_(None),
-            )
+
+        material = await self.get(
+            material_id,
         )
 
-        return self.db.scalar(stmt) is not None
+        if material is None:
+            return False
+
+        material.is_archived = True
+
+        await self._db.commit()
+
+        return True
+
+    async def delete(
+        self,
+        material: StudyMaterial,
+    ) -> None:
+
+        await self._db.delete(material)
+
+        await self._db.commit()

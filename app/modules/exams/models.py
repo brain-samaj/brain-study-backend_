@@ -2,238 +2,435 @@ from __future__ import annotations
 
 from datetime import datetime
 from enum import Enum
-from uuid import UUID
+from uuid import uuid4
 
-from sqlalchemy import Boolean
+from sqlalchemy import DateTime
+from sqlalchemy import Enum as SqlEnum
+from sqlalchemy import Float
 from sqlalchemy import ForeignKey
-from sqlalchemy import JSON
-from sqlalchemy import Numeric
+from sqlalchemy import Integer
 from sqlalchemy import String
 from sqlalchemy import Text
-from sqlalchemy import Enum as SqlEnum
-
+from sqlalchemy.dialects.postgresql import JSONB
+from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped
 from sqlalchemy.orm import mapped_column
 from sqlalchemy.orm import relationship
+from sqlalchemy.sql import func
 
-from app.database.base import BaseModel
+from app.database.base import Base
+
+
+# ============================================================
+# ENUMS
+# ============================================================
 
 
 class ExamType(str, Enum):
     OBJECTIVE = "objective"
     THEORY = "theory"
+    MIXED = "mixed"
+
+
+class ExamDifficulty(str, Enum):
+    EASY = "easy"
+    MEDIUM = "medium"
+    HARD = "hard"
 
 
 class ExamStatus(str, Enum):
     CREATED = "created"
     IN_PROGRESS = "in_progress"
     SUBMITTED = "submitted"
+    GRADING = "grading"
+    GRADED = "graded"
     EXPIRED = "expired"
-    CANCELLED = "cancelled"
+    FAILED = "failed"
 
 
-class ExamSession(BaseModel):
+class QuestionType(str, Enum):
+    OBJECTIVE = "objective"
+    THEORY = "theory"
+
+
+# ============================================================
+# EXAM SESSION
+# ============================================================
+
+
+class ExamSession(Base):
+
     __tablename__ = "exam_sessions"
 
-    user_id: Mapped[UUID] = mapped_column(
-        ForeignKey("users.id", ondelete="CASCADE"),
+
+    id: Mapped[UUID] = mapped_column(
+        UUID(as_uuid=True),
+        primary_key=True,
+        default=uuid4,
+    )
+
+
+    owner_id: Mapped[UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey(
+            "users.id",
+            ondelete="CASCADE",
+        ),
+        nullable=False,
         index=True,
     )
 
-    study_material_id: Mapped[UUID] = mapped_column(
-        ForeignKey("study_materials.id", ondelete="CASCADE"),
+
+    material_id: Mapped[UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey(
+            "study_materials.id",
+            ondelete="CASCADE",
+        ),
+        nullable=False,
         index=True,
     )
+
 
     exam_type: Mapped[ExamType] = mapped_column(
-        SqlEnum(ExamType)
+        SqlEnum(ExamType),
+        nullable=False,
     )
+
+
+    difficulty: Mapped[ExamDifficulty] = mapped_column(
+        SqlEnum(ExamDifficulty),
+        nullable=False,
+    )
+
 
     status: Mapped[ExamStatus] = mapped_column(
         SqlEnum(ExamStatus),
         default=ExamStatus.CREATED,
+        nullable=False,
         index=True,
     )
 
-    duration_minutes: Mapped[int]
 
-    requested_questions: Mapped[int]
-
-    generated_questions: Mapped[int]
-
-    instructions: Mapped[str | None] = mapped_column(
-        Text
+    total_questions: Mapped[int] = mapped_column(
+        Integer,
+        nullable=False,
     )
 
-    started_at: Mapped[datetime | None]
 
-    ends_at: Mapped[datetime | None]
+    total_marks: Mapped[int] = mapped_column(
+        Integer,
+        nullable=False,
+    )
 
-    submitted_at: Mapped[datetime | None]
 
-    score: Mapped[float] = mapped_column(
-        Numeric(6, 2),
+    obtained_marks: Mapped[int] = mapped_column(
+        Integer,
         default=0,
+        nullable=False,
     )
+
 
     percentage: Mapped[float] = mapped_column(
-        Numeric(5, 2),
+        Float,
         default=0,
-    )
-
-    grade: Mapped[str | None] = mapped_column(
-        String(5)
-    )
-
-    ai_feedback: Mapped[str | None] = mapped_column(
-        Text
+        nullable=False,
     )
 
 
-    questions: Mapped[list["ExamQuestion"]] = relationship(
+    duration_minutes: Mapped[int] = mapped_column(
+        Integer,
+        nullable=False,
+    )
+
+
+    started_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True),
+        nullable=True,
+    )
+
+
+    expires_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True),
+        nullable=True,
+    )
+
+
+    submitted_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True),
+        nullable=True,
+    )
+
+
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        nullable=False,
+    )
+
+
+    questions = relationship(
         "ExamQuestion",
         back_populates="session",
         cascade="all, delete-orphan",
+        lazy="selectin",
     )
 
 
-    submissions = relationship(
-        "ExamSubmission",
+    answers = relationship(
+        "ExamAnswer",
         back_populates="session",
         cascade="all, delete-orphan",
+        lazy="selectin",
     )
 
 
-    result = relationship(
-        "ExamResult",
-        back_populates="session",
-        uselist=False,
-        cascade="all, delete-orphan",
-    )
+# ============================================================
+# EXAM QUESTION
+# ============================================================
 
 
-class ExamQuestion(BaseModel):
+class ExamQuestion(Base):
+
     __tablename__ = "exam_questions"
 
+
+    id: Mapped[UUID] = mapped_column(
+        UUID(as_uuid=True),
+        primary_key=True,
+        default=uuid4,
+    )
+
+
     session_id: Mapped[UUID] = mapped_column(
+        UUID(as_uuid=True),
         ForeignKey(
             "exam_sessions.id",
             ondelete="CASCADE",
         ),
+        nullable=False,
         index=True,
     )
 
-    question_number: Mapped[int]
 
-    question_type: Mapped[str]
-
-    topic: Mapped[str]
-
-    difficulty: Mapped[str]
-
-    instruction: Mapped[str | None] = mapped_column(
-        Text
+    question_number: Mapped[int] = mapped_column(
+        Integer,
+        nullable=False,
     )
+
+
+    question_type: Mapped[QuestionType] = mapped_column(
+        SqlEnum(QuestionType),
+        nullable=False,
+    )
+
 
     question: Mapped[str] = mapped_column(
-        Text
+        Text,
+        nullable=False,
     )
 
-    sub_questions: Mapped[dict | None] = mapped_column(
-        JSON
+
+    topic: Mapped[str] = mapped_column(
+        String(255),
+        nullable=False,
     )
 
-    options: Mapped[dict | None] = mapped_column(
-        JSON
+
+    difficulty: Mapped[str] = mapped_column(
+        String(50),
+        nullable=False,
     )
 
-    answer: Mapped[dict | None] = mapped_column(
-        JSON
-    )
-
-    marking_scheme: Mapped[dict | None] = mapped_column(
-        JSON
-    )
-
-    explanation: Mapped[str | None] = mapped_column(
-        Text
-    )
 
     marks: Mapped[int] = mapped_column(
-        default=1
-    )
-
-    shuffle_options: Mapped[bool] = mapped_column(
-        Boolean,
-        default=True,
+        Integer,
+        nullable=False,
     )
 
 
-    session: Mapped["ExamSession"] = relationship(
+    options: Mapped[list] = mapped_column(
+        JSONB,
+        default=list,
+        nullable=False,
+    )
+
+
+    correct_answer: Mapped[str | None] = mapped_column(
+        String(10),
+        nullable=True,
+    )
+
+
+    explanation: Mapped[str | None] = mapped_column(
+        Text,
+        nullable=True,
+    )
+
+
+    subquestions: Mapped[list] = mapped_column(
+        JSONB,
+        default=list,
+        nullable=False,
+    )
+
+
+    marking_scheme: Mapped[list] = mapped_column(
+        JSONB,
+        default=list,
+        nullable=False,
+    )
+
+
+    model_answer: Mapped[str | None] = mapped_column(
+        Text,
+        nullable=True,
+    )
+
+
+    instructions: Mapped[str | None] = mapped_column(
+        Text,
+        nullable=True,
+    )
+
+
+    session = relationship(
         "ExamSession",
         back_populates="questions",
     )
 
 
-    answers: Mapped[list["ExamAnswer"]] = relationship(
-        "ExamAnswer",
-        back_populates="question",
-        cascade="all, delete-orphan",
+# ============================================================
+# EXAM ANSWER
+# ============================================================
+
+
+class ExamAnswer(Base):
+
+    __tablename__ = "exam_answers"
+
+
+    id: Mapped[UUID] = mapped_column(
+        UUID(as_uuid=True),
+        primary_key=True,
+        default=uuid4,
     )
 
 
-class ExamAnswer(BaseModel):
-    __tablename__ = "exam_answers"
-
     session_id: Mapped[UUID] = mapped_column(
+        UUID(as_uuid=True),
         ForeignKey(
             "exam_sessions.id",
             ondelete="CASCADE",
         ),
+        nullable=False,
         index=True,
     )
 
+
     question_id: Mapped[UUID] = mapped_column(
+        UUID(as_uuid=True),
         ForeignKey(
             "exam_questions.id",
             ondelete="CASCADE",
         ),
+        nullable=False,
         index=True,
     )
 
-    typed_answer: Mapped[str | None] = mapped_column(
-        Text
-    )
 
     selected_option: Mapped[str | None] = mapped_column(
-        String(10)
+        String(10),
+        nullable=True,
     )
 
-    handwriting_image: Mapped[str | None] = mapped_column(
-        String(1000)
+
+    text_answer: Mapped[str] = mapped_column(
+        Text,
+        default="",
+        nullable=False,
     )
 
-    ocr_text: Mapped[str | None] = mapped_column(
-        Text
+
+    ocr_answer: Mapped[str] = mapped_column(
+        Text,
+        default="",
+        nullable=False,
     )
 
-    ai_marks: Mapped[float] = mapped_column(
-        Numeric(5,2),
+
+    final_answer: Mapped[str] = mapped_column(
+        Text,
+        default="",
+        nullable=False,
+    )
+
+
+    awarded_marks: Mapped[float] = mapped_column(
+        Float,
         default=0,
-    )
-
-    max_marks: Mapped[float] = mapped_column(
-        Numeric(5,2),
-    )
-
-    is_correct: Mapped[bool | None]
-
-    ai_feedback: Mapped[str | None] = mapped_column(
-        Text
+        nullable=False,
     )
 
 
-    question: Mapped["ExamQuestion"] = relationship(
-        "ExamQuestion",
+    is_correct: Mapped[bool | None] = mapped_column(
+        nullable=True,
+    )
+
+
+    feedback: Mapped[str | None] = mapped_column(
+        Text,
+        nullable=True,
+    )
+
+
+    corrections: Mapped[str | None] = mapped_column(
+        Text,
+        nullable=True,
+    )
+
+
+    suggestions: Mapped[str | None] = mapped_column(
+        Text,
+        nullable=True,
+    )
+
+
+    reasoning: Mapped[str | None] = mapped_column(
+        Text,
+        nullable=True,
+    )
+
+
+    answered_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True),
+        nullable=True,
+    )
+
+
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        onupdate=func.now(),
+        nullable=False,
+    )
+
+
+    session = relationship(
+        "ExamSession",
         back_populates="answers",
+    )
+
+
+    question = relationship(
+        "ExamQuestion",
+        lazy="joined",
+    )
+
+
+    attachments = relationship(
+        "ExamAnswerAttachment",
+        back_populates="answer",
+        cascade="all, delete-orphan",
+        lazy="selectin",
     )

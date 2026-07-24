@@ -1,211 +1,264 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
-from typing import Any
+from datetime import UTC
+from datetime import datetime
 
+from app.ai.services.theory_marker import TheoryMarker
 
-GRADE_SCALE = (
-    (70, "A"),
-    (60, "B"),
-    (50, "C"),
-    (45, "D"),
-    (40, "E"),
-    (0, "F"),
+from app.modules.exams.exceptions import (
+    ObjectiveGradingError,
+    TheoryGradingError,
 )
+from app.modules.exams.models import (
+    ExamQuestion,
+)
+from app.modules.exams.models import (
+    ExamStatus,
+)
+from app.modules.exams.repository import ExamRepository
+from app.modules.exams.result_models import ExamResult
 
 
-@dataclass(slots=True)
-class ObjectiveQuestionResult:
-    question_number: int
-    is_answered: bool
-    is_correct: bool
-    awarded_marks: float
-    max_marks: float
-    correct_answer: Any
-    student_answer: Any
-    explanation: str | None = None
+class ExamGradingService:
+    """
+    Enterprise Exam Grading Engine.
 
+    Responsibilities
+    ----------------
+    Objective:
+        - Instant backend marking.
 
-@dataclass(slots=True)
-class TheoryQuestionResult:
-    question_number: int
-    is_answered: bool
-    awarded_marks: float
-    max_marks: float
-    feedback: str
-    marking_scheme: dict
+    Theory:
+        - AI evaluation through TheoryMarker.
 
+    Final:
+        - Calculate score.
+        - Save ExamResult.
+        - Update session state.
 
-class ExamGradingEngine:
+    The frontend never performs grading.
+    """
 
-    @staticmethod
-    def grade_objective(
+    def __init__(
+        self,
         *,
-        questions: list,
-        student_answers: dict,
-    ) -> dict:
+        repository: ExamRepository,
+        theory_marker: TheoryMarker,
+    ) -> None:
 
-        results = []
+        self._repository = repository
+        self._theory_marker = theory_marker
 
-        total_score = 0.0
-        total_possible = 0.0
 
-        for question in questions:
+    async def grade_session(
+        self,
+        *,
+        session_id,
+    ) -> ExamResult:
 
-            max_marks = float(question.marks)
-            total_possible += max_marks
+        session = await self._repository.get_session(
+            session_id,
+        )
 
-            answer = student_answers.get(str(question.question_number))
-
-            answered = answer is not None
-
-            correct = answered and answer == question.answer["correct"]
-
-            awarded = max_marks if correct else 0.0
-
-            total_score += awarded
-
-            results.append(
-                ObjectiveQuestionResult(
-                    question_number=question.question_number,
-                    is_answered=answered,
-                    is_correct=correct,
-                    awarded_marks=awarded,
-                    max_marks=max_marks,
-                    correct_answer=question.answer["correct"],
-                    student_answer=answer,
-                    explanation=question.explanation,
-                )
+        if session is None:
+            raise ValueError(
+                "Exam session not found."
             )
 
-        percentage = (
-            total_score / total_possible * 100
-            if total_possible
-            else 0
-        )
+        session.status = ExamStatus.GRADING
 
-        grade = ExamGradingEngine.grade_letter(
-            percentage
-        )
+        await self._repository.commit()
 
-        return {
-            "score": total_score,
-            "total": total_possible,
-            "percentage": round(
-                percentage,
-                2,
-            ),
-            "grade": grade,
-            "results": results,
-            "answered": len(student_answers),
-            "unanswered": len(questions) - len(student_answers),
-        }
+        try:
+
+            objective_score = 0
+            theory_score = 0
+
+            correct_answers = 0
+            incorrect_answers = 0
+            unanswered = 0
+
+            for question in session.questions:
+
+                answer = question.answer
+
+                if answer is None:
+
+                    unanswered += 1
+                    continue
 
 
-    @staticmethod
-    def grade_theory(
-        *,
-        question_limit: int,
-        generated_questions: list,
-        ai_marks: dict,
-    ) -> dict:
+                if question.question_type.value == "objective":
 
-        results = []
-
-        total = 0.0
-
-        max_total = 0.0
-
-        marked = 0
-
-        ordered = sorted(
-            generated_questions,
-            key=lambda q: q.question_number,
-        )
-
-        for question in ordered:
-
-            if marked >= question_limit:
-                break
-
-            key = str(question.question_number)
-
-            mark = ai_marks.get(
-                key,
-            )
-
-            max_marks = float(question.marks)
-
-            max_total += max_marks
-
-            if mark is None:
-
-                results.append(
-                    TheoryQuestionResult(
-                        question_number=question.question_number,
-                        is_answered=False,
-                        awarded_marks=0,
-                        max_marks=max_marks,
-                        feedback="Question not answered.",
-                        marking_scheme=question.marking_scheme,
+                    result = (
+                        self._grade_objective(
+                            question,
+                            answer,
+                        )
                     )
-                )
 
-                marked += 1
+                    if result:
 
-                continue
+                        correct_answers += 1
 
-            awarded = float(
-                mark["score"]
+                        objective_score += (
+                            question.marks
+                        )
+
+                    else:
+
+                        incorrect_answers += 1
+
+
+                else:
+
+                    marks = (
+                        await self._grade_theory(
+                            question,
+                            answer,
+                        )
+                    )
+
+                    theory_score += marks
+
+
+            total_score = (
+                objective_score
+                +
+                theory_score
             )
 
-            total += awarded
 
-            results.append(
-                TheoryQuestionResult(
-                    question_number=question.question_number,
-                    is_answered=True,
-                    awarded_marks=awarded,
-                    max_marks=max_marks,
-                    feedback=mark["feedback"],
-                    marking_scheme=question.marking_scheme,
+            percentage = (
+                total_score
+                /
+                session.total_marks
+                *
+                100
+                if session.total_marks
+                else 0
+            )
+
+
+            result = ExamResult(
+                session_id=session.id,
+                owner_id=session.owner_id,
+                material_id=session.material_id,
+                score=int(total_score),
+                total_marks=session.total_marks,
+                percentage=percentage,
+                objective_score=int(
+                    objective_score
+                ),
+                theory_score=int(
+                    theory_score
+                ),
+                correct_answers=correct_answers,
+                incorrect_answers=incorrect_answers,
+                unanswered_questions=unanswered,
+            )
+
+
+            await self._repository.create_result(
+                result,
+            )
+
+
+            session.obtained_marks = int(
+                total_score
+            )
+
+            session.percentage = percentage
+
+            session.status = (
+                ExamStatus.GRADED
+            )
+
+            session.submitted_at = (
+                datetime.now(
+                    UTC,
                 )
             )
 
-            marked += 1
+            await self._repository.commit()
 
-        percentage = (
-            total / max_total * 100
-            if max_total
-            else 0
+            return result
+
+
+        except Exception:
+
+            session.status = ExamStatus.FAILED
+
+            await self._repository.commit()
+
+            raise
+
+
+    def _grade_objective(
+        self,
+        question: ExamQuestion,
+        answer,
+    ) -> bool:
+
+        if not answer.selected_option:
+            return False
+
+        return (
+            answer.selected_option.strip()
+            ==
+            question.correct_answer.strip()
         )
 
-        grade = ExamGradingEngine.grade_letter(
-            percentage
-        )
 
-        return {
-            "score": total,
-            "total": max_total,
-            "percentage": round(
-                percentage,
-                2,
-            ),
-            "grade": grade,
-            "results": results,
-            "required_questions": question_limit,
-        }
+    async def _grade_theory(
+        self,
+        question: ExamQuestion,
+        answer,
+    ) -> float:
+
+        try:
+
+            result = await self._theory_marker.mark(
+                question=question.question,
+                marking_scheme=(
+                    question.marking_scheme
+                ),
+                model_answer=(
+                    question.model_answer
+                ),
+                student_answer=(
+                    answer.final_answer
+                ),
+                total_marks=(
+                    question.marks
+                ),
+            )
+
+            answer.awarded_marks = (
+                result.awarded_marks
+            )
+
+            answer.feedback = (
+                result.feedback
+            )
+
+            answer.reasoning = (
+                result.reasoning
+            )
+
+            answer.corrections = (
+                result.corrections
+            )
+
+            answer.suggestions = (
+                result.suggestions
+            )
+
+            return result.awarded_marks
 
 
-    @staticmethod
-    def grade_letter(
-        percentage: float,
-    ) -> str:
+        except Exception as exc:
 
-        for cutoff, letter in GRADE_SCALE:
-
-            if percentage >= cutoff:
-                return letter
-
-        return "F"
-
+            raise TheoryGradingError(
+                str(exc)
+            ) from exc

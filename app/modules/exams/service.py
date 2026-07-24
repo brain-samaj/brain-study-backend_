@@ -1,192 +1,182 @@
 from __future__ import annotations
 
-from app.modules.exams.grading import ExamGradingEngine
+from datetime import UTC
+from datetime import datetime
+from uuid import UUID
+
+from app.ai.services.exam_generator import ExamGenerator
+from app.modules.exams.exceptions import ExamNotFoundError
+from app.modules.exams.models import ExamQuestion
+from app.modules.exams.models import ExamSession
+from app.modules.exams.models import ExamStatus
+from app.modules.exams.models import QuestionType
+from app.modules.exams.repository import ExamRepository
+from app.modules.exams.schemas import CreateExamRequest
 
 
 class ExamService:
+    """
+    Main Exam Business Service.
+
+    Responsibilities
+    ----------------
+    - Coordinate exam lifecycle.
+    - Communicate with AI generator.
+    - Create sessions.
+    - Store questions.
+    - Submit exams.
+
+    Does NOT:
+    - Access database directly.
+    - Call AI providers directly.
+
+    Dependencies:
+        Repository
+        AI Services
+    """
 
     def __init__(
         self,
-        repository,
-        ai_marker,
-    ):
-        self.repository = repository
-        self.ai_marker = ai_marker
+        *,
+        repository: ExamRepository,
+        generator: ExamGenerator,
+    ) -> None:
 
-    ###########################################################
-    # AUTOSAVE
-    ###########################################################
+        self._repository = repository
+        self._generator = generator
 
-    async def autosave_objective(
+
+    async def create_exam(
         self,
         *,
-        session_id,
-        answers: dict,
-    ):
-        return True
+        owner_id: UUID,
+        material_id: UUID,
+        request: CreateExamRequest,
+        study_content: str,
+    ) -> ExamSession:
 
-    async def autosave_theory(
-        self,
-        *,
-        session_id,
-        answers: dict,
-    ):
-        return True
-
-    async def save_single_theory_answer(
-        self,
-        *,
-        session_id,
-        question_number: int,
-        answer: str,
-    ):
-        return True
-
-    async def process_theory_answer(
-        self,
-        *,
-        session_id,
-        question_number: int,
-    ):
-        return True
-
-    ###########################################################
-    # OBJECTIVE SUBMISSION
-    ###########################################################
-
-    async def submit_objective_exam(
-        self,
-        *,
-        session_id,
-        student_answers: dict,
-    ):
-
-        session = self.repository.get_session(session_id)
-
-        if session is None:
-            raise ValueError("Exam session not found.")
-
-        questions = self.repository.get_questions(session_id)
-
-        result = ExamGradingEngine.grade_objective(
-            questions=questions,
-            student_answers=student_answers,
+        generated = await self._generator.generate(
+            exam_type=request.exam_type.value,
+            study_content=study_content,
+            number_of_questions=request.question_count,
+            difficulty=request.difficulty.value,
         )
 
-        if hasattr(self.repository, "save_objective_result"):
-            self.repository.save_objective_result(
-                session=session,
-                result=result,
-                submitted_answers=student_answers,
-            )
 
-        return result
+        session = ExamSession(
+            owner_id=owner_id,
+            material_id=material_id,
+            exam_type=request.exam_type,
+            difficulty=request.difficulty,
+            total_questions=request.question_count,
+            total_marks=0,
+            duration_minutes=request.duration_minutes,
+            status=ExamStatus.CREATED,
+            started_at=datetime.now(
+                UTC,
+            ),
+        )
 
-    ###########################################################
-    # THEORY SUBMISSION
-    ###########################################################
 
-    async def submit_theory_exam(
-        self,
-        *,
-        session_id,
-        submitted_answers: dict,
-    ):
-
-        session = self.repository.get_session(session_id)
-
-        if session is None:
-            raise ValueError("Exam session not found.")
-
-        questions = self.repository.get_questions(session_id)
-
-        required = getattr(
+        await self._repository.create_session(
             session,
-            "required_questions",
-            len(questions),
         )
 
-        accepted_answers = {}
 
-        ignored_questions = []
+        total_marks = 0
 
-        ordered_numbers = sorted(
-            int(number)
-            for number in submitted_answers.keys()
-        )
 
-        for number in ordered_numbers:
+        for item in generated["questions"]:
 
-            if len(accepted_answers) >= required:
-
-                ignored_questions.append(number)
-
-                continue
-
-            accepted_answers[str(number)] = submitted_answers[str(number)]
-
-        ai_marks = {}
-
-        for question in questions:
-
-            key = str(question.question_number)
-
-            if key not in accepted_answers:
-                continue
-
-            ai_marks[key] = await self.ai_marker.mark_theory_answer(
-                question=question,
-                student_answer=accepted_answers[key],
+            question_type = (
+                QuestionType.OBJECTIVE
+                if "options" in item
+                else QuestionType.THEORY
             )
 
-        result = ExamGradingEngine.grade_theory(
-            question_limit=required,
-            generated_questions=questions,
-            ai_marks=ai_marks,
-        )
 
-        result["ignored_questions"] = ignored_questions
-        result["accepted_answers"] = len(accepted_answers)
-        result["submitted_answers"] = len(submitted_answers)
-
-        if ignored_questions:
-
-            result["warning"] = (
-                "You answered more questions than instructed. "
-                "Only the first required questions were marked."
+            question = ExamQuestion(
+                session_id=session.id,
+                question_number=item[
+                    "question_number"
+                ],
+                question_type=question_type,
+                question=item[
+                    "question"
+                ],
+                topic=item[
+                    "topic"
+                ],
+                difficulty=item[
+                    "difficulty"
+                ],
+                marks=item[
+                    "marks"
+                ],
+                options=item.get(
+                    "options",
+                    [],
+                ),
+                correct_answer=item.get(
+                    "correct_answer",
+                ),
+                explanation=item.get(
+                    "explanation",
+                ),
+                subquestions=item.get(
+                    "subquestions",
+                    [],
+                ),
+                marking_scheme=item.get(
+                    "marking_scheme",
+                    [],
+                ),
+                model_answer=item.get(
+                    "model_answer",
+                ),
+                instructions=item.get(
+                    "instructions",
+                ),
             )
 
-        if hasattr(self.repository, "save_theory_result"):
-            self.repository.save_theory_result(
-                session=session,
-                result=result,
-                submitted_answers=accepted_answers,
+
+            total_marks += (
+                item["marks"]
             )
 
-        return result
 
-    ###########################################################
-    # COMPLETE SUBMISSION
-    ###########################################################
+            await self._repository.create_question(
+                question,
+            )
 
-    async def submit_complete_exam(
+
+        session.total_marks = total_marks
+
+        await self._repository.commit()
+
+
+        return session
+
+
+
+    async def get_exam(
         self,
-        *,
-        session_id,
-    ):
-        return self.repository.get_result(session_id)
+        session_id: UUID,
+    ) -> ExamSession:
 
-    ###########################################################
-    # REGENERATE
-    ###########################################################
+        session = await (
+            self._repository
+            .get_session(
+                session_id,
+            )
+        )
 
-    async def regenerate_exam(
-        self,
-        *,
-        session_id,
-    ):
-        return {
-            "message": "Regeneration endpoint is not yet implemented.",
-            "session_id": str(session_id),
-        }
 
+        if session is None:
+
+            raise ExamNotFoundError(
+                "Exam session not found."
+            )
+
+
+        return session

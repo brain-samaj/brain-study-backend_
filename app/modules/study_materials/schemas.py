@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime
+from enum import Enum
 from uuid import UUID
 
 from pydantic import BaseModel
@@ -8,48 +9,65 @@ from pydantic import ConfigDict
 from pydantic import Field
 
 
+class MaterialType(str, Enum):
+    PDF = "pdf"
+    DOCX = "docx"
+    PPTX = "pptx"
+    TXT = "txt"
+    MD = "md"
+
+
+class ProcessingStatus(str, Enum):
+    UPLOADING = "uploading"
+    EXTRACTING = "extracting"
+    PROCESSING = "processing"
+    READY = "ready"
+    FAILED = "failed"
+
+
 class StudyMaterialCreate(BaseModel):
-    """
-    Metadata supplied alongside an uploaded file.
-    """
+    title: str = Field(..., min_length=1, max_length=255)
+    description: str | None = None
 
-    title: str = Field(
-        ...,
-        min_length=2,
-        max_length=255,
-    )
+    original_filename: str
+    stored_filename: str
+    storage_path: str
 
-    description: str | None = Field(
-        default=None,
-        max_length=5000,
-    )
+    file_type: MaterialType
+    mime_type: str
+
+    file_size: int
+
+    extracted_text: str = ""
+
+    page_count: int | None = None
+
+    word_count: int = 0
 
 
 class StudyMaterialUpdate(BaseModel):
-    """
-    Editable fields.
-    """
+    title: str | None = Field(default=None, max_length=255)
+    description: str | None = None
 
-    title: str | None = Field(
-        default=None,
-        min_length=2,
-        max_length=255,
-    )
+    extracted_text: str | None = None
 
-    description: str | None = Field(
-        default=None,
-        max_length=5000,
-    )
+    page_count: int | None = None
+
+    word_count: int | None = None
+
+    processing_status: ProcessingStatus | None = None
+
+    extraction_error: str | None = None
+
+    is_archived: bool | None = None
 
 
 class StudyMaterialResponse(BaseModel):
-    """
-    Single study material returned to clients.
-    """
+    model_config = ConfigDict(from_attributes=True)
 
     id: UUID
 
-    user_id: UUID
+    owner_id: UUID
 
     title: str
 
@@ -59,40 +77,72 @@ class StudyMaterialResponse(BaseModel):
 
     stored_filename: str
 
-    mime_type: str
+    storage_path: str
 
-    file_extension: str
+    file_type: MaterialType
+
+    mime_type: str
 
     file_size: int
 
-    storage_path: str
+    extracted_text: str
 
-    ai_processed: bool
+    page_count: int | None
+
+    word_count: int
+
+    processing_status: ProcessingStatus
+
+    extraction_error: str | None
+
+    is_archived: bool
 
     created_at: datetime
 
     updated_at: datetime
 
-    model_config = ConfigDict(
-        from_attributes=True,
-    )
+
+class StudyMaterialListItem(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: UUID
+
+    title: str
+
+    file_type: MaterialType
+
+    file_size: int
+
+    page_count: int | None
+
+    word_count: int
+
+    processing_status: ProcessingStatus
+
+    created_at: datetime
 
 
-class StudyMaterialListResponse(BaseModel):
-    """
-    Paginated list of study materials.
-    """
+class StudyMaterialSearchResponse(BaseModel):
+    items: list[StudyMaterialListItem]
 
     total: int
-
-    items: list[StudyMaterialResponse]
 
 
 class DeleteStudyMaterialResponse(BaseModel):
     """
-    Delete confirmation.
+    Response returned after successfully deleting a study material.
     """
 
-    success: bool
+    id: UUID
 
     message: str
+
+
+class StudyMaterialListResponse(BaseModel):
+    """
+    Response returned when listing study materials.
+    """
+
+    items: list[StudyMaterialListItem]
+
+    total: int

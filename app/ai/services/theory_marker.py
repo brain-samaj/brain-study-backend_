@@ -1,87 +1,200 @@
 from __future__ import annotations
 
-import json
+from dataclasses import dataclass
+from typing import Any
 
 from app.ai.client import AIClient
+from app.ai.prompts.theory_marking import (
+    THEORY_MARKING_PROMPT,
+)
+
+
+class TheoryMarkingError(Exception):
+    """
+    Raised when AI theory marking fails.
+    """
+
+
+@dataclass(slots=True)
+class TheoryMarkResult:
+    """
+    Structured result returned by the AI marker.
+    """
+
+    awarded_marks: float
+
+    total_marks: float
+
+    percentage: float
+
+    feedback: str
+
+    corrections: str
+
+    suggestions: str
+
+    reasoning: str
 
 
 class TheoryMarker:
+    """
+    Enterprise Theory Answer Marker.
 
-    def __init__(self):
-        self.ai = AIClient()
+    Responsibilities
+    ----------------
+    • Mark theory answers.
+    • Support typed answers.
+    • Support handwritten answers after OCR.
+    • Validate AI output.
+    • Never expose AI providers.
 
+    AIClient automatically selects:
 
-    async def mark_theory_answer(
+        Primary
+            Groq
+
+        Fallback
+            Gemini
+    """
+
+    def __init__(
+        self,
+        ai_client: AIClient,
+    ) -> None:
+
+        self._client = ai_client
+
+    async def mark(
         self,
         *,
-        question,
+        question: str,
+        marking_scheme: str,
+        model_answer: str,
         student_answer: str,
-    ) -> dict:
+        total_marks: int,
+    ) -> TheoryMarkResult:
 
-        prompt = f"""
-You are an experienced university examiner.
+        prompt = THEORY_MARKING_PROMPT.format(
+            question=question,
+            marking_scheme=marking_scheme,
+            model_answer=model_answer,
+            student_answer=student_answer,
+            total_marks=total_marks,
+        )
 
-You MUST mark exactly according to the marking guide.
+        response = await self._client.generate_json(
+            system_prompt=(
+                "You are an experienced university examiner. "
+                "Return ONLY valid JSON."
+            ),
+            prompt=prompt,
+            temperature=0.2,
+        )
 
-Never give marks based on feelings.
+        self._validate(
+            response,
+            total_marks,
+        )
 
-Question
+        return TheoryMarkResult(
+            awarded_marks=float(
+                response["awarded_marks"],
+            ),
+            total_marks=float(total_marks),
+            percentage=float(
+                response["percentage"],
+            ),
+            feedback=response["feedback"],
+            corrections=response["corrections"],
+            suggestions=response["suggestions"],
+            reasoning=response["reasoning"],
+        )
 
-{question.question}
 
-Official Marking Guide
+    def _validate(
+        self,
+        payload: dict[str, Any],
+        total_marks: int,
+    ) -> None:
+        """
+        Validate the AI marking response.
+        """
 
-{json.dumps(question.marking_scheme, indent=2)}
+        if not isinstance(
+            payload,
+            dict,
+        ):
+            raise TheoryMarkingError(
+                "AI response must be a JSON object."
+            )
 
-Maximum Marks
+        required_fields = (
+            "awarded_marks",
+            "percentage",
+            "feedback",
+            "corrections",
+            "suggestions",
+            "reasoning",
+        )
 
-{question.marks}
+        for field in required_fields:
+            if field not in payload:
+                raise TheoryMarkingError(
+                    f"Missing required field '{field}'."
+                )
 
-Student Answer
+        try:
+            awarded_marks = float(
+                payload["awarded_marks"],
+            )
+        except (TypeError, ValueError) as exc:
+            raise TheoryMarkingError(
+                "'awarded_marks' must be numeric."
+            ) from exc
 
-{student_answer}
+        if awarded_marks < 0:
+            raise TheoryMarkingError(
+                "Awarded marks cannot be negative."
+            )
 
-Instructions
+        if awarded_marks > total_marks:
+            raise TheoryMarkingError(
+                "Awarded marks exceed total marks."
+            )
 
-1. Compare ONLY with the marking guide.
+        try:
+            percentage = float(
+                payload["percentage"],
+            )
+        except (TypeError, ValueError) as exc:
+            raise TheoryMarkingError(
+                "'percentage' must be numeric."
+            ) from exc
 
-2. Award partial marks where appropriate.
+        if percentage < 0 or percentage > 100:
+            raise TheoryMarkingError(
+                "Percentage must be between 0 and 100."
+            )
 
-3. Do not award marks for irrelevant points.
+        for text_field in (
+            "feedback",
+            "corrections",
+            "suggestions",
+            "reasoning",
+        ):
+            value = payload.get(
+                text_field,
+            )
 
-4. Ignore spelling mistakes unless they change meaning.
+            if not isinstance(
+                value,
+                str,
+            ):
+                raise TheoryMarkingError(
+                    f"'{text_field}' must be a string."
+                )
 
-5. Reward equivalent correct explanations.
-
-6. Return detailed feedback.
-
-7. Suggest how the student could improve.
-
-Return ONLY JSON.
-
-{
-    "score":0,
-    "feedback":"",
-    "strengths":[],
-    "mistakes":[],
-    "missing_points":[],
-    "model_answer":""
-}
-"""
-
-        response = await self.ai.generate_json(prompt)
-
-        result = json.loads(response)
-
-        score = float(result["score"])
-
-        if score < 0:
-            score = 0
-
-        if score > question.marks:
-            score = float(question.marks)
-
-        result["score"] = score
-
-        return result
-
+            if not value.strip():
+                raise TheoryMarkingError(
+                    f"'{text_field}' cannot be empty."
+                )

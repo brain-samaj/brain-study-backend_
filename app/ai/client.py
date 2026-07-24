@@ -1,66 +1,118 @@
 from __future__ import annotations
 
-from functools import lru_cache
+import json
+import logging
+from typing import Any
 
-from app.ai.providers.base import BaseAIProvider
-from app.ai.providers.factory import get_ai_provider
+from app.ai.base import AIProviderError, AIProviderUnavailableError
+from app.ai.factory import AIProviderFactory
 
-
-@lru_cache(maxsize=1)
-def get_provider() -> BaseAIProvider:
-    """
-    Returns the configured AI provider.
-
-    Uses the automatic primary/fallback system.
-    """
-
-    return get_ai_provider()
-
+logger = logging.getLogger(__name__)
 
 
 class AIClient:
     """
-    Central AI interface used by Brain Study.
+    Enterprise AI client.
 
-    All AI features communicate through this class.
+    Responsibilities
+    ----------------
+    - Hide provider implementation details.
+    - Select the primary provider through AIProviderFactory.
+    - Automatically fall back to the next provider on failure.
+    - Return only parsed data to application services.
     """
 
     def __init__(
         self,
-        provider: BaseAIProvider | None = None,
+        factory: AIProviderFactory | None = None,
     ) -> None:
-
-        self.provider = provider or get_provider()
-
+        self._factory = factory or AIProviderFactory()
 
     async def generate(
         self,
         *,
         prompt: str,
+        system_prompt: str | None = None,
         temperature: float = 0.2,
         max_tokens: int = 4096,
+        response_format: dict[str, Any] | None = None,
     ) -> str:
+        """
+        Generate text using the first available provider.
+        """
 
-        return await self.provider.generate(
-            prompt=prompt,
-            temperature=temperature,
-            max_tokens=max_tokens,
+        last_error: Exception | None = None
+
+        for provider in self._factory.providers:
+            try:
+                healthy = await provider.health_check()
+
+                if not healthy:
+                    logger.warning(
+                        "Skipping unhealthy AI provider: %s",
+                        provider.name,
+                    )
+                    continue
+
+                logger.info(
+                    "Generating response with provider: %s",
+                    provider.name,
+                )
+
+                return await provider.generate(
+                    prompt=prompt,
+                    system_prompt=system_prompt,
+                    temperature=temperature,
+                    max_tokens=max_tokens,
+                    response_format=response_format,
+                )
+
+            except Exception as exc:
+                last_error = exc
+
+                logger.exception(
+                    "Provider '%s' failed. Trying next provider.",
+                    provider.name,
+                )
+
+        if last_error:
+            raise AIProviderUnavailableError(
+                "All AI providers failed."
+            ) from last_error
+
+        raise AIProviderUnavailableError(
+            "No AI providers are available."
         )
-
 
     async def generate_json(
         self,
         *,
         prompt: str,
+        system_prompt: str | None = None,
         temperature: float = 0.2,
-    ) -> dict:
+        max_tokens: int = 4096,
+    ) -> dict[str, Any]:
+        """
+        Generate structured JSON.
+        """
 
-        return await self.provider.generate_json(
+        raw = await self.generate(
             prompt=prompt,
+            system_prompt=system_prompt,
             temperature=temperature,
+            max_tokens=max_tokens,
+            response_format={
+                "type": "json_object",
+            },
         )
 
+        try:
+            return json.loads(raw)
 
-    async def health(self) -> bool:
-
-        return await self.provider.health()
+        except json.JSONDecodeError as exc:
+            logger.exception(
+                "AI returned invalid JSON."
+            )
+            raise AIProviderError(
+                "AI provider returned malformed JSON."
+            ) from exc

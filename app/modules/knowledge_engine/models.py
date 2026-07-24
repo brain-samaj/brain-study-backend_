@@ -1,116 +1,141 @@
 from __future__ import annotations
 
 from datetime import datetime
-from uuid import UUID
+from enum import Enum
+from uuid import uuid4
 
 from sqlalchemy import Boolean
 from sqlalchemy import DateTime
+from sqlalchemy import Enum as SqlEnum
 from sqlalchemy import ForeignKey
-from sqlalchemy import Index
 from sqlalchemy import Integer
-from sqlalchemy import String
 from sqlalchemy import Text
+from sqlalchemy.dialects.postgresql import JSONB
+from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped
 from sqlalchemy.orm import mapped_column
 from sqlalchemy.orm import relationship
+from sqlalchemy.sql import func
 
-from app.database.base import BaseModel
+from app.database.base import Base
 
 
-class KnowledgeSource(BaseModel):
+class KnowledgeStatus(str, Enum):
+    PENDING = "pending"
+    PROCESSING = "processing"
+    READY = "ready"
+    FAILED = "failed"
+
+
+class KnowledgeSource(Base):
     """
-    Canonical knowledge extracted from uploaded
-    study materials or typed topics.
+    Stores AI-processed knowledge extracted from a study material.
 
-    Everything in Brain Study (Study Guide,
-    Smart Study, Flashcards, Exams) is generated
-    from this model.
+    One uploaded material has exactly one KnowledgeSource.
+
+    This table is the canonical knowledge store used by:
+      • Exams
+      • Flashcards
+      • Smart Study
+      • Summaries
+      • AI Tutor
+      • Future learning features
+
+    The frontend never interacts with this table directly.
     """
 
     __tablename__ = "knowledge_sources"
 
-    __table_args__ = (
-        Index("ix_knowledge_user_id", "user_id"),
-        Index("ix_knowledge_source_type", "source_type"),
-        Index("ix_knowledge_subject", "subject"),
-        Index("ix_knowledge_status", "processing_status"),
+    id: Mapped[UUID] = mapped_column(
+        UUID(as_uuid=True),
+        primary_key=True,
+        default=uuid4,
     )
 
-    user_id: Mapped[UUID] = mapped_column(
-        ForeignKey("users.id", ondelete="CASCADE"),
+    material_id: Mapped[UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey(
+            "study_materials.id",
+            ondelete="CASCADE",
+        ),
         nullable=False,
-    )
-
-    # Link back to the uploaded Study Material.
-    # Topics created without a file will keep this NULL.
-    study_material_id: Mapped[UUID | None] = mapped_column(
-        ForeignKey("study_materials.id", ondelete="SET NULL"),
-        nullable=True,
         unique=True,
+        index=True,
     )
 
-    source_type: Mapped[str] = mapped_column(
-        String(50),
+    status: Mapped[KnowledgeStatus] = mapped_column(
+        SqlEnum(KnowledgeStatus),
+        default=KnowledgeStatus.PENDING,
         nullable=False,
+        index=True,
     )
 
     title: Mapped[str] = mapped_column(
-        String(255),
+        Text,
         nullable=False,
     )
 
-    subject: Mapped[str] = mapped_column(
-        String(120),
+    summary: Mapped[str] = mapped_column(
+        Text,
+        nullable=False,
+        default="",
+    )
+
+    knowledge: Mapped[dict] = mapped_column(
+        JSONB,
+        nullable=False,
+        default=dict,
+    )
+
+    topics: Mapped[list] = mapped_column(
+        JSONB,
+        nullable=False,
+        default=list,
+    )
+
+    glossary: Mapped[list] = mapped_column(
+        JSONB,
+        nullable=False,
+        default=list,
+    )
+
+    learning_objectives: Mapped[list] = mapped_column(
+        JSONB,
+        nullable=False,
+        default=list,
+    )
+
+    key_points: Mapped[list] = mapped_column(
+        JSONB,
+        nullable=False,
+        default=list,
+    )
+
+    sample_questions: Mapped[list] = mapped_column(
+        JSONB,
+        nullable=False,
+        default=list,
+    )
+
+    total_tokens: Mapped[int] = mapped_column(
+        Integer,
+        default=0,
         nullable=False,
     )
 
-    description: Mapped[str | None] = mapped_column(
+    ai_provider: Mapped[str | None] = mapped_column(
         Text,
         nullable=True,
     )
 
-    file_name: Mapped[str | None] = mapped_column(
-        String(500),
+    ai_model: Mapped[str | None] = mapped_column(
+        Text,
         nullable=True,
     )
 
-    file_path: Mapped[str | None] = mapped_column(
-        String(1000),
-        nullable=True,
-    )
-
-    file_size: Mapped[int | None] = mapped_column(
+    processing_time_ms: Mapped[int | None] = mapped_column(
         Integer,
         nullable=True,
-    )
-
-    mime_type: Mapped[str | None] = mapped_column(
-        String(255),
-        nullable=True,
-    )
-
-    raw_text: Mapped[str | None] = mapped_column(
-        Text,
-        nullable=True,
-    )
-
-    cleaned_text: Mapped[str | None] = mapped_column(
-        Text,
-        nullable=True,
-    )
-
-    ocr_completed: Mapped[bool] = mapped_column(
-        Boolean,
-        default=False,
-        server_default="false",
-        nullable=False,
-    )
-
-    processing_status: Mapped[str] = mapped_column(
-        String(50),
-        default="pending",
-        server_default="pending",
-        nullable=False,
     )
 
     error_message: Mapped[str | None] = mapped_column(
@@ -118,28 +143,27 @@ class KnowledgeSource(BaseModel):
         nullable=True,
     )
 
-    processed_at: Mapped[datetime | None] = mapped_column(
+    is_cached: Mapped[bool] = mapped_column(
+        Boolean,
+        default=False,
+        nullable=False,
+    )
+
+    created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
-        nullable=True,
+        server_default=func.now(),
+        nullable=False,
+    )
+
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        onupdate=func.now(),
+        nullable=False,
     )
 
     study_material = relationship(
         "StudyMaterial",
-        lazy="joined",
+        back_populates="knowledge_source",
+        uselist=False,
     )
-
-    owner = relationship(
-        "User",
-        lazy="joined",
-    )
-
-    def __repr__(self) -> str:
-        return (
-            f"<KnowledgeSource("
-            f"id={self.id}, "
-            f"title='{self.title}', "
-            f"subject='{self.subject}', "
-            f"type='{self.source_type}'"
-            f")>"
-        )
-

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime
+from enum import Enum
 from uuid import UUID
 
 from pydantic import BaseModel
@@ -8,92 +9,119 @@ from pydantic import ConfigDict
 from pydantic import Field
 
 
-class CreateTopicRequest(BaseModel):
-    """
-    Create a topic without uploading a document.
-    """
-
-    title: str = Field(
-        min_length=3,
-        max_length=255,
-    )
-
-    subject: str = Field(
-        min_length=2,
-        max_length=120,
-    )
-
-    topic_description: str = Field(
-        min_length=20,
-    )
+class KnowledgeStatus(str, Enum):
+    PENDING = "pending"
+    PROCESSING = "processing"
+    READY = "ready"
+    FAILED = "failed"
 
 
-class KnowledgeSourceResponse(BaseModel):
-    """
-    Response returned after creating a topic
-    or uploading a study material.
-    """
+class KnowledgeTopic(BaseModel):
+    title: str
+    content: str
+    keywords: list[str] = Field(default_factory=list)
+    difficulty: str | None = None
 
-    model_config = ConfigDict(
-        from_attributes=True,
-    )
+
+class GlossaryItem(BaseModel):
+    term: str
+    definition: str
+
+
+class LearningObjective(BaseModel):
+    objective: str
+
+
+class SampleQuestion(BaseModel):
+    question: str
+    answer: str
+
+
+class KnowledgeCreate(BaseModel):
+    material_id: UUID
+    title: str
+    summary: str = ""
+    knowledge: dict = Field(default_factory=dict)
+    topics: list[KnowledgeTopic] = Field(default_factory=list)
+    glossary: list[GlossaryItem] = Field(default_factory=list)
+    learning_objectives: list[LearningObjective] = Field(default_factory=list)
+    key_points: list[str] = Field(default_factory=list)
+    sample_questions: list[SampleQuestion] = Field(default_factory=list)
+    total_tokens: int = 0
+    ai_provider: str | None = None
+    ai_model: str | None = None
+    processing_time_ms: int | None = None
+    is_cached: bool = False
+
+
+class KnowledgeUpdate(BaseModel):
+    status: KnowledgeStatus | None = None
+    summary: str | None = None
+    knowledge: dict | None = None
+    topics: list[KnowledgeTopic] | None = None
+    glossary: list[GlossaryItem] | None = None
+    learning_objectives: list[LearningObjective] | None = None
+    key_points: list[str] | None = None
+    sample_questions: list[SampleQuestion] | None = None
+    total_tokens: int | None = None
+    ai_provider: str | None = None
+    ai_model: str | None = None
+    processing_time_ms: int | None = None
+    error_message: str | None = None
+    is_cached: bool | None = None
+
+
+class KnowledgeResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
 
     id: UUID
+    material_id: UUID
+
+    status: KnowledgeStatus
 
     title: str
+    summary: str
 
-    subject: str
+    knowledge: dict
 
-    source_type: str
+    topics: list[KnowledgeTopic]
 
-    processing_status: str
+    glossary: list[GlossaryItem]
 
+    learning_objectives: list[LearningObjective]
 
-class KnowledgeSourceDetails(BaseModel):
+    key_points: list[str]
 
-    model_config = ConfigDict(
-        from_attributes=True,
-    )
+    sample_questions: list[SampleQuestion]
 
-    id: UUID
+    total_tokens: int
 
-    title: str
+    ai_provider: str | None
 
-    subject: str
+    ai_model: str | None
 
-    source_type: str
-
-    description: str | None
-
-    raw_text: str | None
-
-    cleaned_text: str | None
-
-    processing_status: str
+    processing_time_ms: int | None
 
     error_message: str | None
 
-    file_name: str | None
-
-    file_size: int | None
-
-    mime_type: str | None
+    is_cached: bool
 
     created_at: datetime
 
     updated_at: datetime
 
-    processed_at: datetime | None
 
+class KnowledgeSummaryResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
 
-class UploadResponse(BaseModel):
+    material_id: UUID
 
-    id: UUID
+    status: KnowledgeStatus
 
     title: str
 
-    subject: str
+    summary: str
 
-    source_type: str
+    topics: list[KnowledgeTopic]
 
-    processing_status: str
+    key_points: list[str]

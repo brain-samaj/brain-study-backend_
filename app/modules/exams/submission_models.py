@@ -1,97 +1,173 @@
 from __future__ import annotations
 
 from datetime import datetime
-from uuid import UUID
+from enum import Enum
+from uuid import uuid4
 
 from sqlalchemy import Boolean
 from sqlalchemy import DateTime
-from sqlalchemy import Float
+from sqlalchemy import Enum as SqlEnum
 from sqlalchemy import ForeignKey
 from sqlalchemy import Integer
-from sqlalchemy import JSON
-from sqlalchemy import String
 from sqlalchemy import Text
+from sqlalchemy.dialects.postgresql import JSONB
+from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped
 from sqlalchemy.orm import mapped_column
 from sqlalchemy.orm import relationship
+from sqlalchemy.sql import func
 
-from app.database.base import BaseModel
+from app.database.base import Base
 
 
-class ExamSubmission(BaseModel):
+class SubmissionStatus(str, Enum):
+    """
+    Lifecycle of an exam submission.
+    """
+
+    DRAFT = "draft"
+    AUTOSAVED = "autosaved"
+    SUBMITTED = "submitted"
+    GRADING = "grading"
+    GRADED = "graded"
+    FAILED = "failed"
+
+
+class ExamSubmission(Base):
+    """
+    Immutable submission record.
+
+    Purpose
+    -------
+    Records the exact state of an exam when the student
+    pressed "Submit".
+
+    This provides:
+    - audit trail
+    - dispute resolution
+    - analytics
+    - grading history
+    - future re-grading support
+
+    A submission references an ExamSession while preserving
+    a snapshot of the student's work at submission time.
+    """
 
     __tablename__ = "exam_submissions"
 
+    id: Mapped[UUID] = mapped_column(
+        UUID(as_uuid=True),
+        primary_key=True,
+        default=uuid4,
+    )
+
     session_id: Mapped[UUID] = mapped_column(
+        UUID(as_uuid=True),
         ForeignKey(
             "exam_sessions.id",
             ondelete="CASCADE",
         ),
         nullable=False,
+        unique=True,
         index=True,
     )
 
-    question_id: Mapped[UUID] = mapped_column(
+    owner_id: Mapped[UUID] = mapped_column(
+        UUID(as_uuid=True),
         ForeignKey(
-            "exam_questions.id",
+            "users.id",
             ondelete="CASCADE",
         ),
         nullable=False,
         index=True,
     )
 
-    question_number: Mapped[int] = mapped_column(
+    material_id: Mapped[UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey(
+            "study_materials.id",
+            ondelete="CASCADE",
+        ),
+        nullable=False,
+        index=True,
+    )
+
+    status: Mapped[SubmissionStatus] = mapped_column(
+        SqlEnum(SubmissionStatus),
+        default=SubmissionStatus.DRAFT,
+        nullable=False,
+        index=True,
+    )
+
+    submitted_answers: Mapped[list] = mapped_column(
+        JSONB,
+        default=list,
+        nullable=False,
+    )
+
+    question_snapshot: Mapped[list] = mapped_column(
+        JSONB,
+        default=list,
+        nullable=False,
+    )
+
+    grading_snapshot: Mapped[dict] = mapped_column(
+        JSONB,
+        default=dict,
+        nullable=False,
+    )
+
+    total_questions: Mapped[int] = mapped_column(
         Integer,
         nullable=False,
     )
 
-    answer_type: Mapped[str] = mapped_column(
-        String(20),
-        nullable=False,
-    )
-
-    typed_answer: Mapped[str | None] = mapped_column(
-        Text,
-    )
-
-    handwritten_image: Mapped[str | None] = mapped_column(
-        String(1000),
-    )
-
-    extracted_text: Mapped[str | None] = mapped_column(
-        Text,
-    )
-
-    awarded_marks: Mapped[float] = mapped_column(
-        Float,
+    answered_questions: Mapped[int] = mapped_column(
+        Integer,
         default=0,
-    )
-
-    max_marks: Mapped[float] = mapped_column(
-        Float,
         nullable=False,
     )
 
-    ai_feedback: Mapped[dict | None] = mapped_column(
-        JSON,
+    attachment_count: Mapped[int] = mapped_column(
+        Integer,
+        default=0,
+        nullable=False,
     )
 
-    is_marked: Mapped[bool] = mapped_column(
+    contains_handwritten_answers: Mapped[bool] = mapped_column(
         Boolean,
         default=False,
+        nullable=False,
+    )
+
+    client_version: Mapped[str | None] = mapped_column(
+        Text,
+        nullable=True,
+    )
+
+    submission_notes: Mapped[str | None] = mapped_column(
+        Text,
+        nullable=True,
     )
 
     submitted_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
-        default=datetime.utcnow,
+        server_default=func.now(),
+        nullable=False,
+    )
+
+    graded_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True),
+        nullable=True,
+    )
+
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        nullable=False,
     )
 
     session = relationship(
         "ExamSession",
-        back_populates="submissions",
+        lazy="joined",
     )
-
-    question = relationship(
-        "ExamQuestion",
-    )
-

@@ -1,219 +1,171 @@
 from __future__ import annotations
 
 from pathlib import Path
-from uuid import uuid4
+from uuid import UUID
 
-from fastapi import HTTPException
 from fastapi import UploadFile
-from fastapi import status
 
-from app.modules.auth.models import User
-from app.modules.knowledge_engine.repository import KnowledgeRepository
+from app.modules.knowledge_engine.service import KnowledgeEngineService
+from app.modules.study_materials.models import ProcessingStatus
 from app.modules.study_materials.models import StudyMaterial
 from app.modules.study_materials.repository import StudyMaterialRepository
-from app.modules.study_materials.schemas import (
-    StudyMaterialCreate,
-    StudyMaterialUpdate,
-)
+from app.modules.study_materials.schemas import StudyMaterialCreate
+from app.modules.study_materials.schemas import StudyMaterialUpdate
 
 
 class StudyMaterialService:
+    """
+    Enterprise Study Material Service.
 
-    STORAGE_DIR = Path("storage/study_materials")
+    Responsibilities
+    ----------------
+    - Upload study materials
+    - Read study materials
+    - Update study materials
+    - Archive/Delete study materials
+    - Trigger Knowledge Engine
 
-    ALLOWED_EXTENSIONS = {
-        ".pdf",
-        ".docx",
-        ".pptx",
-        ".txt",
-        ".png",
-        ".jpg",
-        ".jpeg",
-        ".bmp",
-        ".gif",
-        ".webp",
-    }
-
-    MAX_FILE_SIZE = 25 * 1024 * 1024
+    NOT Responsible For
+    -------------------
+    - AI Prompting
+    - AI Generation
+    - Exam Generation
+    - Flashcards
+    - Summaries
+    """
 
     def __init__(
         self,
         repository: StudyMaterialRepository,
-        knowledge_repository: KnowledgeRepository,
-    ):
-        self.repository = repository
-        self.knowledge_repository = knowledge_repository
+        knowledge_service: KnowledgeEngineService,
+    ) -> None:
+        self._repository = repository
+        self._knowledge_service = knowledge_service
 
-        self.STORAGE_DIR.mkdir(
-            parents=True,
-            exist_ok=True,
-        )
-
-    async def create_from_topic(
+    async def create(
         self,
         *,
-        current_user: User,
-        title: str,
-        subject: str,
-        topic_description: str,
-    ):
-
-        material = StudyMaterial(
-            user_id=current_user.id,
-            title=title.strip(),
-            description=topic_description.strip(),
-            original_filename="Topic",
-            stored_filename="topic",
-            mime_type="text/plain",
-            file_extension=".topic",
-            file_size=len(topic_description.encode("utf-8")),
-            storage_path="",
-            extracted_text=topic_description.strip(),
-            ai_processed=False,
-        )
-
-        material = self.repository.create(material)
-
-        await self.knowledge_repository.create_topic(
-            user_id=current_user.id,
-            study_material_id=material.id,
-            title=title.strip(),
-            subject=subject,
-            topic_description=topic_description.strip(),
-        )
-
-        material.ai_processed = True
-
-        return self.repository.update(material)
-
-    async def upload(
-        self,
-        *,
-        current_user: User,
-        metadata: StudyMaterialCreate,
+        owner_id: UUID,
         file: UploadFile,
-    ):
+        stored_filename: str,
+        storage_path: str,
+        extracted_text: str,
+        page_count: int | None,
+    ) -> StudyMaterial:
+        """
+        Persist uploaded study material and immediately
+        build the Knowledge Engine.
+        """
 
-        extension = Path(file.filename).suffix.lower()
+        suffix = Path(file.filename or "").suffix.lower().replace(".", "")
 
-        if extension not in self.ALLOWED_EXTENSIONS:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Unsupported file type.",
+        material = await self._repository.create(
+            owner_id=owner_id,
+            data=StudyMaterialCreate(
+                title=Path(file.filename or "Untitled").stem,
+                description=None,
+                original_filename=file.filename or "Untitled",
+                stored_filename=stored_filename,
+                storage_path=storage_path,
+                file_type=suffix,
+                mime_type=file.content_type or "application/octet-stream",
+                file_size=0,
+                extracted_text=extracted_text,
+                page_count=page_count,
+                word_count=len(extracted_text.split()),
+            ),
+        )
+
+        await self._repository.update_processing_status(
+            material_id=material.id,
+            status=ProcessingStatus.PROCESSING,
+        )
+
+        try:
+            await self._knowledge_service.build_from_material(
+                material_id=material.id,
             )
 
-        contents = await file.read()
-
-        if len(contents) > self.MAX_FILE_SIZE:
-            raise HTTPException(
-                status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
-                detail="File exceeds maximum size.",
+            await self._repository.update_processing_status(
+                material_id=material.id,
+                status=ProcessingStatus.READY,
             )
 
-        stored_filename = f"{uuid4()}{extension}"
+        except Exception as exc:
 
-        storage_path = self.STORAGE_DIR / stored_filename
-
-        with storage_path.open("wb") as output:
-            output.write(contents)
-
-        file.file.seek(0)
-
-        material = StudyMaterial(
-            user_id=current_user.id,
-            title=metadata.title.strip(),
-            description=metadata.description,
-            original_filename=file.filename,
-            stored_filename=stored_filename,
-            mime_type=file.content_type or "application/octet-stream",
-            file_extension=extension,
-            file_size=len(contents),
-            storage_path=str(storage_path),
-            extracted_text=None,
-            ai_processed=False,
-        )
-
-        material = self.repository.create(material)
-
-        await self.knowledge_repository.save_document(
-            user_id=current_user.id,
-            study_material_id=material.id,
-            file=file,
-        )
-
-        material.ai_processed = True
-
-        return self.repository.update(material)
-
-    def list(
-        self,
-        *,
-        current_user: User,
-        skip: int = 0,
-        limit: int = 20,
-    ):
-        return self.repository.list_by_user(
-            current_user.id,
-            skip,
-            limit,
-        )
-
-    def get(
-        self,
-        *,
-        material_id,
-        current_user: User,
-    ):
-
-        material = self.repository.get_by_user(
-            material_id,
-            current_user.id,
-        )
-
-        if material is None:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="Study material not found.",
+            await self._repository.update_processing_status(
+                material_id=material.id,
+                status=ProcessingStatus.FAILED,
+                extraction_error=str(exc),
             )
+
+            raise
 
         return material
 
-    def update(
+    async def get(
         self,
         *,
-        material_id,
-        current_user: User,
+        material_id: UUID,
+        owner_id: UUID,
+    ) -> StudyMaterial | None:
+
+        return await self._repository.get_for_owner(
+            material_id=material_id,
+            owner_id=owner_id,
+        )
+
+    async def list(
+        self,
+        *,
+        owner_id: UUID,
+        skip: int = 0,
+        limit: int = 20,
+    ) -> list[StudyMaterial]:
+
+        return await self._repository.list_for_owner(
+            owner_id=owner_id,
+            skip=skip,
+            limit=limit,
+        )
+
+    async def count(
+        self,
+        owner_id: UUID,
+    ) -> int:
+
+        return await self._repository.count_for_owner(
+            owner_id,
+        )
+
+    async def update(
+        self,
+        *,
+        material: StudyMaterial,
         payload: StudyMaterialUpdate,
-    ):
+    ) -> StudyMaterial:
 
-        material = self.get(
-            material_id=material_id,
-            current_user=current_user,
+        return await self._repository.update(
+            material,
+            payload,
         )
 
-        if payload.title is not None:
-            material.title = payload.title.strip()
-
-        if payload.description is not None:
-            material.description = payload.description
-
-        return self.repository.update(material)
-
-    def delete(
+    async def archive(
         self,
         *,
-        material_id,
-        current_user: User,
-    ):
+        material_id: UUID,
+    ) -> bool:
 
-        material = self.get(
-            material_id=material_id,
-            current_user=current_user,
+        return await self._repository.archive(
+            material_id,
         )
 
-        path = Path(material.storage_path)
+    async def delete(
+        self,
+        *,
+        material: StudyMaterial,
+    ) -> None:
 
-        if path.exists():
-            path.unlink()
-
-        self.repository.delete(material)
+        await self._repository.delete(
+            material,
+        )

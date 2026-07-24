@@ -1,85 +1,106 @@
-from __future__ import annotations
+"""
+Production Objective Exam Prompt.
 
+The AI MUST return ONLY valid JSON.
 
-class ObjectiveExamPromptBuilder:
+No markdown.
 
-    @staticmethod
-    def build(
-        *,
-        subject: str,
-        topic: str,
-        difficulty: str,
-        question_count: int,
-        content: str,
-    ) -> str:
+No explanations.
 
-        return f"""
-You are an elite examination setter.
+No code fences.
 
-Create a professional objective examination.
+No additional text.
+"""
 
-Rules
+OBJECTIVE_EXAM_PROMPT = """
+You are an elite university examination paper setter.
 
-- Return ONLY valid JSON.
-- No markdown.
-- No explanations outside JSON.
-- Every question must have exactly four options.
-- Only one correct answer.
-- Questions must test understanding, not memorization.
-- Include easy, medium and hard questions.
-- Base everything on the supplied material.
+Generate high-quality MULTIPLE CHOICE QUESTIONS only.
 
-JSON FORMAT
+==============================
+Study Material
+==============================
 
-[
-  {{
-    "question":"",
-    "options":[
-      "",
-      "",
-      "",
-      ""
-    ],
-    "correct_answer":"",
-    "explanation":"",
-    "difficulty":"medium"
-  }}
-]
+{study_content}
 
-Subject:
-{subject}
-
-Topic:
-{topic}
+==============================
+Requirements
+==============================
 
 Difficulty:
 {difficulty}
 
-Questions:
+Total Questions:
 {question_count}
 
-Material
+Generate questions strictly from the supplied study material.
 
-{content}
+Do NOT invent facts.
+
+Do NOT ask questions unrelated to the material.
+
+Questions should test:
+
+- Understanding
+- Application
+- Analysis
+- Recall where appropriate
+
+Every question must contain:
+
+- question_number
+- question
+- options
+- correct_answer
+- explanation
+- topic
+- difficulty
+- marks
+
+Options MUST contain exactly four choices.
+
+Correct answer MUST be one of:
+
+A
+B
+C
+D
+
+Marks must be positive integers.
+
+Difficulty should match the requested level.
+
+==============================
+Output JSON ONLY
+==============================
+
+{
+  "questions": [
+    {
+      "question_number": 1,
+      "question": "...",
+      "options": [
+        "...",
+        "...",
+        "...",
+        "..."
+      ],
+      "correct_answer": "A",
+      "explanation": "...",
+      "topic": "...",
+      "difficulty": "...",
+      "marks": 2
+    }
+  ]
+}
+
+Return ONLY valid JSON.
+
+No markdown.
+
+No comments.
+
+No code fences.
+
+No extra text.
 """
-
-
-def build_objective_prompt(
-    *,
-    analysis,
-    material: str,
-    total_questions: int,
-    difficulty: str = "mixed",
-) -> str:
-    """
-    Backward compatible wrapper.
-    Existing services can use this while the new builder remains the source of truth.
-    """
-
-    return ObjectiveExamPromptBuilder.build(
-        subject=analysis.subject,
-        topic=analysis.topic,
-        difficulty=difficulty,
-        question_count=total_questions,
-        content=material,
-    )

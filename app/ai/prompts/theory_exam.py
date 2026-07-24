@@ -1,85 +1,142 @@
-from __future__ import annotations
+"""
+Production Theory Exam Prompt.
+
+The AI MUST return ONLY valid JSON.
+
+No markdown.
+
+No explanations outside JSON.
+
+No code fences.
+"""
 
 
-class TheoryExamPromptBuilder:
+THEORY_EXAM_PROMPT = """
+You are an expert academic examiner responsible for creating
+professional theory examination questions.
 
-    @staticmethod
-    def build(
-        *,
-        subject: str,
-        topic: str,
-        difficulty: str,
-        question_count: int,
-        content: str,
-    ) -> str:
+Generate THEORY QUESTIONS ONLY from the supplied study material.
 
-        return f"""
-You are an experienced university examination setter.
+==============================
+Study Material
+==============================
 
-Generate a professional THEORY examination.
+{study_content}
 
-Rules
-
-- Return ONLY valid JSON.
-- No markdown.
-- No explanations outside JSON.
-- Questions must require reasoning.
-- Cover every important concept from the material.
-- Mix define, explain, compare, discuss, calculate,
-  evaluate and analyze questions.
-- Increase difficulty gradually.
-- Every question must include marking guidance.
-
-Return ONLY JSON.
-
-[
-  {{
-    "question":"",
-
-    "marks":10,
-
-    "difficulty":"medium",
-
-    "expected_points":[
-      "",
-      "",
-      ""
-    ],
-
-    "sample_answer":""
-  }}
-]
-
-Subject:
-{subject}
-
-Topic:
-{topic}
+==============================
+Exam Configuration
+==============================
 
 Difficulty:
 {difficulty}
 
-Questions:
+Number of Questions:
 {question_count}
 
-Material:
+==============================
+Question Requirements
+==============================
 
-{content}
+Each theory question must evaluate:
+
+- Understanding
+- Explanation ability
+- Critical thinking
+- Application of concepts
+
+Questions must be directly based on the supplied material.
+
+Do NOT introduce information outside the material.
+
+Each question must include:
+
+1. question_number
+
+2. question
+
+3. subquestions
+
+4. marking_scheme
+
+5. model_answer
+
+6. instructions
+
+7. topic
+
+8. difficulty
+
+9. marks
+
+
+==============================
+Marking Scheme Rules
+==============================
+
+The marking scheme must clearly show:
+
+- Expected points
+- Marks allocated
+- What earns full marks
+
+Example:
+
+[
+  {
+    "point": "Definition of concept",
+    "marks": 2
+  },
+  {
+    "point": "Explanation with example",
+    "marks": 3
+  }
+]
+
+
+==============================
+Output Format
+==============================
+
+Return ONLY JSON:
+
+{
+  "questions": [
+    {
+      "question_number": 1,
+      "question": "...",
+
+      "subquestions": [
+        "..."
+      ],
+
+      "marking_scheme": [
+        {
+          "point": "...",
+          "marks": 2
+        }
+      ],
+
+      "model_answer": "...",
+
+      "instructions": "...",
+
+      "topic": "...",
+
+      "difficulty": "...",
+
+      "marks": 10
+    }
+  ]
+}
+
+
+IMPORTANT:
+
+Return valid JSON only.
+
+No markdown.
+
+No explanations.
+
+No additional text.
 """
-
-
-def build_theory_exam_prompt(
-    *,
-    analysis,
-    material: str,
-    total_questions: int,
-    difficulty: str = "mixed",
-) -> str:
-
-    return TheoryExamPromptBuilder.build(
-        subject=analysis.subject,
-        topic=analysis.topic,
-        difficulty=difficulty,
-        question_count=total_questions,
-        content=material,
-    )
