@@ -6,9 +6,9 @@ from sqlalchemy import Boolean
 from sqlalchemy import DateTime
 from sqlalchemy import Index
 from sqlalchemy import String
-from sqlalchemy import func
 from sqlalchemy.orm import Mapped
 from sqlalchemy.orm import mapped_column
+from sqlalchemy.orm import relationship
 
 from app.database.base import BaseModel
 
@@ -80,6 +80,17 @@ class User(BaseModel):
     deleted_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True),
         nullable=True,
+    )
+
+    # ==========================
+    # Relationships
+    # ==========================
+
+    study_materials = relationship(
+        "StudyMaterial",
+        back_populates="owner",
+        cascade="all, delete-orphan",
+        passive_deletes=True,
     )
 
     def __repr__(self) -> str:
