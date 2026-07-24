@@ -69,7 +69,6 @@ class ExamSession(Base):
         default=uuid4,
     )
 
-
     owner_id: Mapped[UUID] = mapped_column(
         UUID(as_uuid=True),
         ForeignKey(
@@ -79,7 +78,6 @@ class ExamSession(Base):
         nullable=False,
         index=True,
     )
-
 
     material_id: Mapped[UUID] = mapped_column(
         UUID(as_uuid=True),
@@ -91,20 +89,19 @@ class ExamSession(Base):
         index=True,
     )
 
-owner = relationship(
-    "User",
-)
+    owner = relationship(
+        "User",
+    )
 
-study_material = relationship(
-    "StudyMaterial",
-    back_populates="exam_sessions",
-)
+    study_material = relationship(
+        "StudyMaterial",
+        back_populates="exam_sessions",
+    )
 
     exam_type: Mapped[ExamType] = mapped_column(
         SqlEnum(ExamType),
         nullable=False,
     )
-
 
     difficulty: Mapped[ExamDifficulty] = mapped_column(
         SqlEnum(ExamDifficulty),
