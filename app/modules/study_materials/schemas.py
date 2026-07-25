@@ -1,28 +1,14 @@
 from __future__ import annotations
 
 from datetime import datetime
-from enum import Enum
 from uuid import UUID
 
 from pydantic import BaseModel
 from pydantic import ConfigDict
 from pydantic import Field
 
-
-class MaterialType(str, Enum):
-    PDF = "pdf"
-    DOCX = "docx"
-    PPTX = "pptx"
-    TXT = "txt"
-    MD = "md"
-
-
-class ProcessingStatus(str, Enum):
-    UPLOADING = "uploading"
-    EXTRACTING = "extracting"
-    PROCESSING = "processing"
-    READY = "ready"
-    FAILED = "failed"
+from app.modules.study_materials.models import MaterialType
+from app.modules.study_materials.models import ProcessingStatus
 
 
 class StudyMaterialCreate(BaseModel):
@@ -41,7 +27,6 @@ class StudyMaterialCreate(BaseModel):
     extracted_text: str = ""
 
     page_count: int | None = None
-
     word_count: int = 0
 
 
@@ -52,11 +37,9 @@ class StudyMaterialUpdate(BaseModel):
     extracted_text: str | None = None
 
     page_count: int | None = None
-
     word_count: int | None = None
 
     processing_status: ProcessingStatus | None = None
-
     extraction_error: str | None = None
 
     is_archived: bool | None = None
@@ -66,39 +49,30 @@ class StudyMaterialResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     id: UUID
-
     owner_id: UUID
 
     title: str
-
     description: str | None
 
     original_filename: str
-
     stored_filename: str
-
     storage_path: str
 
     file_type: MaterialType
-
     mime_type: str
-
     file_size: int
 
     extracted_text: str
 
     page_count: int | None
-
     word_count: int
 
     processing_status: ProcessingStatus
-
     extraction_error: str | None
 
     is_archived: bool
 
     created_at: datetime
-
     updated_at: datetime
 
 
@@ -122,27 +96,16 @@ class StudyMaterialListItem(BaseModel):
     created_at: datetime
 
 
-class StudyMaterialSearchResponse(BaseModel):
+class StudyMaterialListResponse(BaseModel):
+    total: int
     items: list[StudyMaterialListItem]
 
+
+class StudyMaterialSearchResponse(BaseModel):
     total: int
+    items: list[StudyMaterialListItem]
 
 
 class DeleteStudyMaterialResponse(BaseModel):
-    """
-    Response returned after successfully deleting a study material.
-    """
-
-    id: UUID
-
+    success: bool
     message: str
-
-
-class StudyMaterialListResponse(BaseModel):
-    """
-    Response returned when listing study materials.
-    """
-
-    items: list[StudyMaterialListItem]
-
-    total: int

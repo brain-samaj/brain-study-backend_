@@ -2,7 +2,8 @@ from __future__ import annotations
 
 import json
 import re
-from typing import Iterable
+from collections.abc import Iterable
+from typing import Any
 
 from groq import AsyncGroq
 
@@ -11,11 +12,15 @@ from app.core.config import settings
 
 
 class GroqProvider(BaseAIProvider):
+    """
+    Enterprise Groq Provider.
 
-    # Keep below Groq free/on-demand TPM limits
-    # Approximation: 1 token ≈ 4 characters
+    Compatible with AIClient.
+    """
+
+    name = "Groq"
+
     MAX_PROMPT_CHARS = 16000
-
 
     def __init__(self) -> None:
 
@@ -25,156 +30,145 @@ class GroqProvider(BaseAIProvider):
 
         self.model = settings.GROQ_MODEL
 
+    # ==========================================================
+    # INTERNAL
+    # ==========================================================
 
-
-    def trim_prompt(
+    def _trim(
         self,
         prompt: str,
     ) -> str:
 
         if len(prompt) <= self.MAX_PROMPT_CHARS:
-
             return prompt
 
-
         return (
-            prompt[:self.MAX_PROMPT_CHARS]
-            +
-            "\n\n"
-            "[Content shortened to fit processing limits.]"
+            prompt[: self.MAX_PROMPT_CHARS]
+            + "\n\n[Content truncated.]"
         )
 
+    # ==========================================================
+    # HEALTH CHECK
+    # ==========================================================
 
+    async def health_check(
+        self,
+    ) -> bool:
+
+        try:
+
+            await self.generate(
+                prompt="Reply ONLY with OK",
+                max_tokens=5,
+            )
+
+            return True
+
+        except Exception:
+
+            return False
+
+    # ==========================================================
+    # GENERATE
+    # ==========================================================
 
     async def generate(
         self,
         *,
         prompt: str,
+        system_prompt: str | None = None,
         temperature: float = 0.2,
         max_tokens: int = 2048,
+        response_format: dict[str, Any] | None = None,
     ) -> str:
 
+        prompt = self._trim(prompt)
 
-        safe_prompt = self.trim_prompt(
-            prompt
+        system = (
+            system_prompt
+            or (
+                "You are Brain Study's AI engine.\n"
+                "Generate accurate educational content.\n"
+                "Follow every instruction exactly."
+            )
         )
 
+        if response_format:
+
+            system += (
+                "\n\nReturn ONLY valid JSON."
+                "\nDo not wrap it inside markdown."
+            )
 
         response = await self.client.chat.completions.create(
-
             model=self.model,
-
             temperature=temperature,
-
             max_tokens=max_tokens,
-
             messages=[
-
                 {
                     "role": "system",
-                    "content": (
-                        "You are Brain Study's educational engine.\n"
-                        "Create accurate and structured learning content.\n"
-                        "Follow instructions exactly.\n"
-                        "Never add unnecessary explanations."
-                    ),
+                    "content": system,
                 },
-
                 {
                     "role": "user",
-                    "content": safe_prompt,
+                    "content": prompt,
                 },
-
             ],
-
         )
 
-
         return (
-            response
-            .choices[0]
-            .message
-            .content
+            response.choices[0]
+            .message.content
             .strip()
         )
 
-
+    # ==========================================================
+    # JSON
+    # ==========================================================
 
     async def generate_json(
         self,
         *,
         prompt: str,
+        system_prompt: str | None = None,
         temperature: float = 0.2,
-    ) -> dict:
+        max_tokens: int = 2048,
+    ) -> dict[str, Any]:
 
-
-        safe_prompt = self.trim_prompt(
-            prompt
-        )
-
-
-        safe_prompt += (
-
-            "\n\nIMPORTANT:\n"
-            "Return ONLY valid JSON.\n"
-            "Do NOT use markdown.\n"
-            "Do NOT use ```json.\n"
-            "Do not include explanations.\n"
-            "Output must begin with '{' and end with '}'."
-
-        )
-
-
-        result = await self.generate(
-            prompt=safe_prompt,
+        text = await self.generate(
+            prompt=prompt,
+            system_prompt=system_prompt,
             temperature=temperature,
-            max_tokens=2048,
+            max_tokens=max_tokens,
+            response_format={
+                "type": "json_object",
+            },
         )
 
-
-        result = result.strip()
-
-
-        # Remove markdown if model ignores instructions
-        result = re.sub(
+        text = re.sub(
             r"^```(?:json)?",
             "",
-            result,
+            text,
             flags=re.IGNORECASE,
         )
 
-
-        result = re.sub(
+        text = re.sub(
             r"```$",
             "",
-            result,
+            text,
         ).strip()
 
-
-
-        start = result.find("{")
-
-        end = result.rfind("}")
-
+        start = text.find("{")
+        end = text.rfind("}")
 
         if start != -1 and end != -1:
+            text = text[start : end + 1]
 
-            result = result[start:end + 1]
+        return json.loads(text)
 
-
-
-        try:
-
-            return json.loads(result)
-
-
-        except json.JSONDecodeError as exc:
-
-            raise ValueError(
-                f"Groq returned invalid JSON:\n\n{result}"
-            ) from exc
-
-
+    # ==========================================================
+    # EMBEDDINGS
+    # ==========================================================
 
     async def embeddings(
         self,
@@ -182,25 +176,5 @@ class GroqProvider(BaseAIProvider):
     ) -> list[list[float]]:
 
         raise NotImplementedError(
-            "Groq currently does not provide embeddings."
+            "Groq does not provide embeddings."
         )
-
-
-
-    async def health(
-        self,
-    ) -> bool:
-
-        try:
-
-            await self.generate(
-                prompt="Reply with OK",
-                max_tokens=5,
-            )
-
-            return True
-
-
-        except Exception:
-
-            return False

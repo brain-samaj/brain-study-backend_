@@ -26,6 +26,13 @@ class MaterialType(str, Enum):
     PPTX = "pptx"
     TXT = "txt"
     MD = "md"
+    PNG = "png"
+    JPG = "jpg"
+    JPEG = "jpeg"
+    WEBP = "webp"
+    BMP = "bmp"
+    GIF = "gif"
+    TOPIC = "topic"
 
 
 class ProcessingStatus(str, Enum):
@@ -38,18 +45,15 @@ class ProcessingStatus(str, Enum):
 
 class StudyMaterial(Base):
     """
-    Canonical study material entity.
+    Canonical Study Material.
 
-    Responsibilities
-    ----------------
-    - Stores uploaded study material metadata.
-    - Stores extracted plain text.
-    - Owns one KnowledgeSource.
-    - Owns many ExamSessions.
-    - Belongs to one User.
+    Supports:
+    • Uploaded documents
+    • Uploaded handwritten images
+    • Topic/description based materials
 
-    The frontend interacts only with this entity.
-    AI services consume the extracted content.
+    This entity is the single source of truth for every
+    learning asset inside Brain Study.
     """
 
     __tablename__ = "study_materials"
@@ -103,13 +107,14 @@ class StudyMaterial(Base):
     )
 
     mime_type: Mapped[str] = mapped_column(
-        String(120),
+        String(150),
         nullable=False,
     )
 
     file_size: Mapped[int] = mapped_column(
         Integer,
         nullable=False,
+        default=0,
     )
 
     extracted_text: Mapped[str] = mapped_column(
@@ -179,3 +184,13 @@ class StudyMaterial(Base):
         cascade="all, delete-orphan",
         passive_deletes=True,
     )
+
+    def __repr__(self) -> str:
+        return (
+            f"<StudyMaterial("
+            f"id={self.id}, "
+            f"title={self.title!r}, "
+            f"type={self.file_type.value}, "
+            f"status={self.processing_status.value}"
+            f")>"
+        )

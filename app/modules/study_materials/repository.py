@@ -2,36 +2,25 @@ from __future__ import annotations
 
 from uuid import UUID
 
-from sqlalchemy import func
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.modules.study_materials.models import ProcessingStatus
-from app.modules.study_materials.models import StudyMaterial
-from app.modules.study_materials.schemas import StudyMaterialCreate
-from app.modules.study_materials.schemas import StudyMaterialUpdate
+from app.modules.study_materials.models import (
+    ProcessingStatus,
+    StudyMaterial,
+)
+from app.modules.study_materials.schemas import (
+    StudyMaterialCreate,
+    StudyMaterialUpdate,
+)
 
 
 class StudyMaterialRepository:
     """
-    Repository responsible ONLY for StudyMaterial persistence.
-
-    Responsibilities
-    ----------------
-    - CRUD operations
-    - Search
-    - Ownership lookups
-    - Status updates
-
-    No business logic.
-    No AI.
-    No file extraction.
+    Repository responsible only for database persistence.
     """
 
-    def __init__(
-        self,
-        db: AsyncSession,
-    ) -> None:
+    def __init__(self, db: AsyncSession) -> None:
         self._db = db
 
     async def create(
@@ -58,9 +47,7 @@ class StudyMaterialRepository:
         )
 
         self._db.add(material)
-
         await self._db.commit()
-
         await self._db.refresh(material)
 
         return material
@@ -72,7 +59,7 @@ class StudyMaterialRepository:
 
         result = await self._db.execute(
             select(StudyMaterial).where(
-                StudyMaterial.id == material_id,
+                StudyMaterial.id == material_id
             )
         )
 
@@ -108,9 +95,7 @@ class StudyMaterialRepository:
                 StudyMaterial.owner_id == owner_id,
                 StudyMaterial.is_archived.is_(False),
             )
-            .order_by(
-                StudyMaterial.created_at.desc(),
-            )
+            .order_by(StudyMaterial.created_at.desc())
             .offset(skip)
             .limit(limit)
         )
@@ -139,19 +124,12 @@ class StudyMaterialRepository:
         payload: StudyMaterialUpdate,
     ) -> StudyMaterial:
 
-        updates = payload.model_dump(
-            exclude_none=True,
-        )
-
-        for field, value in updates.items():
-            setattr(
-                material,
-                field,
-                value,
-            )
+        for field, value in payload.model_dump(
+            exclude_none=True
+        ).items():
+            setattr(material, field, value)
 
         await self._db.commit()
-
         await self._db.refresh(material)
 
         return material
@@ -164,9 +142,7 @@ class StudyMaterialRepository:
         extraction_error: str | None = None,
     ) -> StudyMaterial | None:
 
-        material = await self.get(
-            material_id,
-        )
+        material = await self.get(material_id)
 
         if material is None:
             return None
@@ -175,7 +151,6 @@ class StudyMaterialRepository:
         material.extraction_error = extraction_error
 
         await self._db.commit()
-
         await self._db.refresh(material)
 
         return material
@@ -185,9 +160,7 @@ class StudyMaterialRepository:
         material_id: UUID,
     ) -> bool:
 
-        material = await self.get(
-            material_id,
-        )
+        material = await self.get(material_id)
 
         if material is None:
             return False
@@ -204,5 +177,4 @@ class StudyMaterialRepository:
     ) -> None:
 
         await self._db.delete(material)
-
         await self._db.commit()

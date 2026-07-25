@@ -6,23 +6,42 @@ from fastapi import APIRouter
 from fastapi import Depends
 from fastapi import File
 from fastapi import Form
+from fastapi import HTTPException
+from fastapi import Query
 from fastapi import UploadFile
 from fastapi import status
-from sqlalchemy.orm import Session
+
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from app.ai.client import AIClient
 
 from app.database.session import get_db
-from app.modules.auth.dependencies import get_current_user
+
+from app.dependencies.auth import get_current_user
+
 from app.modules.auth.models import User
-from app.modules.knowledge_engine.repository import KnowledgeRepository
-from app.modules.study_materials.repository import StudyMaterialRepository
+
+from app.modules.knowledge_engine.repository import (
+    KnowledgeRepository,
+)
+
+from app.modules.knowledge_engine.service import (
+    KnowledgeEngineService,
+)
+
+from app.modules.study_materials.repository import (
+    StudyMaterialRepository,
+)
+
 from app.modules.study_materials.schemas import (
     DeleteStudyMaterialResponse,
-    StudyMaterialCreate,
     StudyMaterialListResponse,
     StudyMaterialResponse,
-    StudyMaterialUpdate,
 )
-from app.modules.study_materials.service import StudyMaterialService
+
+from app.modules.study_materials.service import (
+    StudyMaterialService,
+)
 
 router = APIRouter(
     prefix="/study-materials",
@@ -31,11 +50,72 @@ router = APIRouter(
 
 
 def get_service(
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_db),
 ) -> StudyMaterialService:
+
+    material_repository = StudyMaterialRepository(db)
+
+    knowledge_service = KnowledgeEngineService(
+        repository=KnowledgeRepository(db),
+        study_material_repository=material_repository,
+        ai_client=AIClient(),
+    )
+
     return StudyMaterialService(
-        repository=StudyMaterialRepository(db),
-        knowledge_repository=KnowledgeRepository(db),
+        repository=material_repository,
+        knowledge_service=knowledge_service,
+        ai_client=AIClient(),
+    )
+
+@router.post(
+    "/upload",
+    response_model=StudyMaterialResponse,
+    status_code=status.HTTP_201_CREATED,
+)
+async def upload_material(
+    title: str = Form(...),
+    description: str | None = Form(None),
+    file: UploadFile = File(...),
+    current_user: User = Depends(get_current_user),
+    service: StudyMaterialService = Depends(get_service),
+) -> StudyMaterialResponse:
+    """
+    Upload a study material.
+
+    Supported formats
+
+    • PDF
+
+    • DOCX
+
+    • PPTX
+
+    • TXT
+
+    • Markdown
+
+    • PNG
+
+    • JPG
+
+    • JPEG
+
+    • BMP
+
+    • GIF
+
+    • WEBP
+    """
+
+    material = await service.upload(
+        current_user=current_user,
+        title=title,
+        description=description,
+        file=file,
+    )
+
+    return StudyMaterialResponse.model_validate(
+        material,
     )
 
 
@@ -44,96 +124,169 @@ def get_service(
     response_model=StudyMaterialResponse,
     status_code=status.HTTP_201_CREATED,
 )
-async def create_topic(
+async def create_topic_material(
     title: str = Form(...),
-    subject: str = Form(...),
     description: str = Form(...),
     current_user: User = Depends(get_current_user),
     service: StudyMaterialService = Depends(get_service),
-):
-    return await service.create_from_topic(
+) -> StudyMaterialResponse:
+    """
+    Create a study material without uploading a file.
+
+    Useful for:
+
+    • AI-generated notes
+
+    • Typed lecture notes
+
+    • Manual topics
+
+    • Research ideas
+    """
+
+    material = await service.create_from_topic(
         current_user=current_user,
-        title=title,
-        subject=subject,
-        topic_description=description,
-    )
-
-
-@router.post(
-    "/upload",
-    response_model=StudyMaterialResponse,
-    status_code=status.HTTP_201_CREATED,
-)
-async def upload_study_material(
-    title: str = Form(...),
-    description: str | None = Form(None),
-    file: UploadFile = File(...),
-    current_user: User = Depends(get_current_user),
-    service: StudyMaterialService = Depends(get_service),
-):
-    payload = StudyMaterialCreate(
         title=title,
         description=description,
     )
 
-    return await service.upload(
-        current_user=current_user,
-        metadata=payload,
-        file=file,
+    return StudyMaterialResponse.model_validate(
+        material,
     )
 
-
 @router.get(
-    "",
+    "/",
     response_model=StudyMaterialListResponse,
 )
-def list_study_materials(
-    skip: int = 0,
-    limit: int = 20,
+async def list_study_materials(
+    skip: int = Query(
+        0,
+        ge=0,
+    ),
+    limit: int = Query(
+        20,
+        ge=1,
+        le=100,
+    ),
     current_user: User = Depends(get_current_user),
     service: StudyMaterialService = Depends(get_service),
-):
-    items = service.list(
+) -> StudyMaterialListResponse:
+    """
+    List all study materials belonging to the current user.
+    """
+
+    items = await service.list(
         current_user=current_user,
         skip=skip,
         limit=limit,
     )
 
-    return {
-        "total": len(items),
-        "items": items,
-    }
+    return StudyMaterialListResponse(
+        items=[
+            StudyMaterialResponse.model_validate(item)
+            for item in items
+        ],
+        total=len(items),
+    )
 
 
 @router.get(
     "/{material_id}",
     response_model=StudyMaterialResponse,
 )
-def get_study_material(
+async def get_study_material(
     material_id: UUID,
     current_user: User = Depends(get_current_user),
     service: StudyMaterialService = Depends(get_service),
-):
-    return service.get(
+) -> StudyMaterialResponse:
+    """
+    Retrieve a single study material.
+    """
+
+    material = await service.get(
         material_id=material_id,
         current_user=current_user,
     )
+
+    return StudyMaterialResponse.model_validate(
+        material,
+    )
+
+
+from app.modules.study_materials.schemas import (
+    StudyMaterialUpdate,
+)
 
 
 @router.patch(
     "/{material_id}",
     response_model=StudyMaterialResponse,
 )
-def update_study_material(
+async def update_study_material(
     material_id: UUID,
     payload: StudyMaterialUpdate,
     current_user: User = Depends(get_current_user),
     service: StudyMaterialService = Depends(get_service),
-):
-    return service.update(
+) -> StudyMaterialResponse:
+    """
+    Update a study material.
+    """
+
+    material = await service.update(
         material_id=material_id,
-        payload=payload,
         current_user=current_user,
+        payload=payload,
+    )
+
+    return StudyMaterialResponse.model_validate(
+        material,
+    )
+
+
+@router.post(
+    "/{material_id}/archive",
+    status_code=status.HTTP_200_OK,
+)
+async def archive_study_material(
+    material_id: UUID,
+    current_user: User = Depends(get_current_user),
+    service: StudyMaterialService = Depends(get_service),
+):
+    """
+    Archive a study material.
+    """
+
+    await service.archive(
+        material_id=material_id,
+        current_user=current_user,
+    )
+
+    return {
+        "success": True,
+        "message": "Study material archived successfully.",
+    }
+
+
+@router.post(
+    "/{material_id}/reprocess",
+    response_model=StudyMaterialResponse,
+)
+async def reprocess_study_material(
+    material_id: UUID,
+    current_user: User = Depends(get_current_user),
+    service: StudyMaterialService = Depends(get_service),
+) -> StudyMaterialResponse:
+    """
+    Rebuild AI knowledge from the study material.
+    """
+
+    material = await service.reprocess(
+        material_id=material_id,
+        current_user=current_user,
+    )
+
+    return StudyMaterialResponse.model_validate(
+        material,
     )
 
 
@@ -141,17 +294,22 @@ def update_study_material(
     "/{material_id}",
     response_model=DeleteStudyMaterialResponse,
 )
-def delete_study_material(
+async def delete_study_material(
     material_id: UUID,
     current_user: User = Depends(get_current_user),
     service: StudyMaterialService = Depends(get_service),
-):
-    service.delete(
+) -> DeleteStudyMaterialResponse:
+    """
+    Permanently delete a study material.
+    """
+
+    await service.delete(
         material_id=material_id,
         current_user=current_user,
     )
 
-    return {
-        "success": True,
-        "message": "Study material deleted successfully.",
-    }
+    return DeleteStudyMaterialResponse(
+        success=True,
+        message="Study material deleted successfully.",
+    )
+
