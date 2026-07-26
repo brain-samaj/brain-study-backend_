@@ -40,6 +40,8 @@ class StudyGuideService:
             else source.status
         )
 
+        source_status = str(source_status).upper()
+
         if source_status != "READY":
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
