@@ -41,7 +41,7 @@ class ExamService:
         Create an exam directly from the stored study material.
         """
 
-        material = await self._repository.get_material(material_id)
+study_material = await self._repository.get_study_material(material_id)
 
         if material is None:
             raise ValueError("Study material not found.")
