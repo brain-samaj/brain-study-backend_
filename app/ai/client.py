@@ -106,13 +106,16 @@ class AIClient:
             },
         )
 
+        logger.error("========== RAW AI RESPONSE ==========")
+        logger.error("%r", raw)
+        logger.error("=====================================")
+
         try:
             return json.loads(raw)
 
         except json.JSONDecodeError as exc:
-            logger.exception(
-                "AI returned invalid JSON."
-            )
+            logger.exception("AI returned invalid JSON.")
+
             raise AIProviderError(
-                "AI provider returned malformed JSON."
+                f"AI provider returned malformed JSON. Raw response: {raw!r}"
             ) from exc
