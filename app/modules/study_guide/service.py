@@ -34,10 +34,16 @@ class StudyGuideService:
                 detail="Knowledge source not found.",
             )
 
-        if source.status != "READY":
+        source_status = (
+            source.status.value
+            if hasattr(source.status, "value")
+            else source.status
+        )
+
+        if source_status != "READY":
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Knowledge source is not ready yet.",
+                detail=f"Knowledge source is not ready yet. Current status: {source_status}",
             )
 
         if not source.knowledge:
