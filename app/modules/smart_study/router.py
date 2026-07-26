@@ -9,7 +9,7 @@ from fastapi import status
 
 from sqlalchemy.orm import Session
 
-from app.database.session import get_db
+from app.database.async_session import get_async_db
 from app.modules.auth.dependencies import get_current_user
 from app.modules.auth.models import User
 

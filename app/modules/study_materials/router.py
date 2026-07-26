@@ -15,7 +15,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.ai.client import AIClient
 
-from app.database.session import get_db
+from app.database.async_session import get_async_db
 
 from app.modules.auth.dependencies import get_current_user
 
