@@ -23,7 +23,6 @@ class GeminiProvider(BaseAIProvider):
     MAX_PROMPT_CHARS = 16000
 
     def __init__(self) -> None:
-
         if not settings.GEMINI_API_KEY:
             raise ValueError(
                 "GEMINI_API_KEY is missing."
@@ -39,11 +38,7 @@ class GeminiProvider(BaseAIProvider):
     # INTERNAL
     # ==========================================================
 
-    def _trim(
-        self,
-        prompt: str,
-    ) -> str:
-
+    def _trim(self, prompt: str) -> str:
         if len(prompt) <= self.MAX_PROMPT_CHARS:
             return prompt
 
@@ -56,21 +51,14 @@ class GeminiProvider(BaseAIProvider):
     # HEALTH CHECK
     # ==========================================================
 
-    async def health(
-        self,
-    ) -> bool:
-
+    async def health(self) -> bool:
         try:
-
             await self.generate(
                 prompt="Reply ONLY with OK",
                 max_tokens=5,
             )
-
             return True
-
         except Exception:
-
             return False
 
     # ==========================================================
@@ -86,7 +74,6 @@ class GeminiProvider(BaseAIProvider):
         max_tokens: int = 4096,
         response_format: dict[str, Any] | None = None,
     ) -> str:
-
         prompt = self._trim(prompt)
 
         system = (
@@ -99,7 +86,6 @@ class GeminiProvider(BaseAIProvider):
         )
 
         if response_format:
-
             system += (
                 "\n\nReturn ONLY valid JSON."
                 "\nDo not wrap it inside markdown."
@@ -107,11 +93,7 @@ class GeminiProvider(BaseAIProvider):
 
         response = await self.client.aio.models.generate_content(
             model=self.model,
-            contents=(
-                system
-                + "\n\n"
-                + prompt
-            ),
+            contents=system + "\n\n" + prompt,
             config={
                 "temperature": temperature,
                 "max_output_tokens": max_tokens,
@@ -119,7 +101,6 @@ class GeminiProvider(BaseAIProvider):
         )
 
         if not response.text:
-
             raise ValueError(
                 "Gemini returned empty response."
             )
@@ -138,7 +119,6 @@ class GeminiProvider(BaseAIProvider):
         temperature: float = 0.2,
         max_tokens: int = 4096,
     ) -> dict[str, Any]:
-
         text = await self.generate(
             prompt=prompt,
             system_prompt=system_prompt,
@@ -166,15 +146,11 @@ class GeminiProvider(BaseAIProvider):
         end = text.rfind("}")
 
         if start != -1 and end != -1:
-
             text = text[start : end + 1]
 
         try:
-
             return json.loads(text)
-
         except json.JSONDecodeError as exc:
-
             raise ValueError(
                 f"Gemini returned invalid JSON:\n\n{text}"
             ) from exc
@@ -187,7 +163,6 @@ class GeminiProvider(BaseAIProvider):
         self,
         texts: Iterable[str],
     ) -> list[list[float]]:
-
         raise NotImplementedError(
             "Gemini embeddings are not implemented."
         )

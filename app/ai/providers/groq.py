@@ -23,22 +23,16 @@ class GroqProvider(BaseAIProvider):
     MAX_PROMPT_CHARS = 16000
 
     def __init__(self) -> None:
-
         self.client = AsyncGroq(
             api_key=settings.GROQ_API_KEY,
         )
-
         self.model = settings.GROQ_MODEL
 
     # ==========================================================
     # INTERNAL
     # ==========================================================
 
-    def _trim(
-        self,
-        prompt: str,
-    ) -> str:
-
+    def _trim(self, prompt: str) -> str:
         if len(prompt) <= self.MAX_PROMPT_CHARS:
             return prompt
 
@@ -47,25 +41,19 @@ class GroqProvider(BaseAIProvider):
             + "\n\n[Content truncated.]"
         )
 
-# ==========================================================
-# HEALTH CHECK
-# ==========================================================
+    # ==========================================================
+    # HEALTH CHECK
+    # ==========================================================
 
-async def health(
-    self,
-) -> bool:
-
-    try:
-
-        await self.generate(
-            prompt="Reply ONLY with OK",
-            max_tokens=5,
-        )
-
-        return True
-
-    except Exception:
-        return False
+    async def health(self) -> bool:
+        try:
+            await self.generate(
+                prompt="Reply ONLY with OK",
+                max_tokens=5,
+            )
+            return True
+        except Exception:
+            return False
 
     # ==========================================================
     # GENERATE
@@ -80,7 +68,6 @@ async def health(
         max_tokens: int = 2048,
         response_format: dict[str, Any] | None = None,
     ) -> str:
-
         prompt = self._trim(prompt)
 
         system = (
@@ -93,7 +80,6 @@ async def health(
         )
 
         if response_format:
-
             system += (
                 "\n\nReturn ONLY valid JSON."
                 "\nDo not wrap it inside markdown."
@@ -115,11 +101,7 @@ async def health(
             ],
         )
 
-        return (
-            response.choices[0]
-            .message.content
-            .strip()
-        )
+        return response.choices[0].message.content.strip()
 
     # ==========================================================
     # JSON
@@ -129,16 +111,11 @@ async def health(
         self,
         *,
         prompt: str,
-        system_prompt: str | None = None,
         temperature: float = 0.2,
-        max_tokens: int = 2048,
-    ) -> dict[str, Any]:
-
+    ) -> dict:
         text = await self.generate(
             prompt=prompt,
-            system_prompt=system_prompt,
             temperature=temperature,
-            max_tokens=max_tokens,
             response_format={
                 "type": "json_object",
             },
@@ -173,7 +150,6 @@ async def health(
         self,
         texts: Iterable[str],
     ) -> list[list[float]]:
-
         raise NotImplementedError(
             "Groq does not provide embeddings."
         )
