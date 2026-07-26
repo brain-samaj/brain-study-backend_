@@ -56,32 +56,18 @@ router = APIRouter(
 async def create_exam(
     material_id: UUID,
     request: CreateExamRequest,
-    current_user=Depends(
-        get_current_user,
-    ),
-    service: ExamService = Depends(
-        get_exam_service,
-    ),
+    current_user=Depends(get_current_user),
+    service: ExamService = Depends(get_exam_service),
 ):
+    print("========== CREATE EXAM ==========")
+    print("material_id =", material_id)
+    print("request =", request.model_dump())
+    print("=================================")
 
-    try:
-
-        exam = await service.create_exam(
-            owner_id=current_user.id,
-            material_id=material_id,
-            request=request,
-        )
-
-        return exam
-
-
-    except Exception as exc:
-
-        raise HTTPException(
-            status_code=400,
-            detail=str(exc),
-        ) from exc
-
+    raise HTTPException(
+        status_code=418,
+        detail="Endpoint reached.",
+    )
 
 
 # ============================================================
