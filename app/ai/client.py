@@ -37,9 +37,6 @@ class AIClient:
         max_tokens: int = 4096,
         response_format: dict[str, Any] | None = None,
     ) -> str:
-        """
-        Generate text using the first available provider.
-        """
 
         last_error: Exception | None = None
 
@@ -92,9 +89,6 @@ class AIClient:
         temperature: float = 0.2,
         max_tokens: int = 4096,
     ) -> dict[str, Any]:
-        """
-        Generate structured JSON.
-        """
 
         raw = await self.generate(
             prompt=prompt,
@@ -106,16 +100,30 @@ class AIClient:
             },
         )
 
-        logger.error("========== RAW AI RESPONSE ==========")
-        logger.error("%r", raw)
-        logger.error("=====================================")
+        logger.info("Raw AI response:\n%s", raw)
+
+        cleaned = raw.strip()
+
+        if cleaned.startswith("```"):
+            lines = cleaned.splitlines()
+
+            if lines and lines[0].startswith("```"):
+                lines = lines[1:]
+
+            if lines and lines[-1].strip() == "```":
+                lines = lines[:-1]
+
+            cleaned = "\n".join(lines).strip()
 
         try:
-            return json.loads(raw)
+            return json.loads(cleaned)
 
         except json.JSONDecodeError as exc:
             logger.exception("AI returned invalid JSON.")
 
+            logger.error("RAW RESPONSE:\n%s", raw)
+            logger.error("CLEANED RESPONSE:\n%s", cleaned)
+
             raise AIProviderError(
-                f"AI provider returned malformed JSON. Raw response: {raw!r}"
+                "AI provider returned malformed JSON."
             ) from exc
