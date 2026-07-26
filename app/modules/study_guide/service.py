@@ -1,7 +1,6 @@
 from __future__ import annotations
 
-from fastapi import HTTPException
-from fastapi import status
+from fastapi import HTTPException, status
 
 from app.ai.services.teacher import TeacherAI
 from app.modules.knowledge_engine.repository import KnowledgeRepository
@@ -11,18 +10,14 @@ class StudyGuideService:
     """
     Generates a complete study guide from a Study Material.
 
-    Frontend only sends:
-
-        study_material_id
-
-    Backend automatically:
+    Flow:
 
         Study Material
-            ↓
+              ↓
         Knowledge Engine
-            ↓
+              ↓
         Teacher AI
-            ↓
+              ↓
         Complete Study Guide
     """
 
@@ -39,10 +34,9 @@ class StudyGuideService:
         study_material_id,
         education_level: str,
     ):
-
-source = await self.repository.get_by_material(
-    material_id
-)
+        source = await self.repository.get_by_material(
+            study_material_id
+        )
 
         if source is None:
             raise HTTPException(
@@ -68,4 +62,3 @@ source = await self.repository.get_by_material(
             material=source.cleaned_text,
             education_level=education_level,
         )
-
