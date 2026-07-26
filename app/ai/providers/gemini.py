@@ -56,7 +56,7 @@ class GeminiProvider(BaseAIProvider):
     # HEALTH CHECK
     # ==========================================================
 
-    async def health_check(
+    async def health(
         self,
     ) -> bool:
 

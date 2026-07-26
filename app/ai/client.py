@@ -45,7 +45,7 @@ class AIClient:
 
         for provider in self._factory.providers:
             try:
-                healthy = await provider.health_check()
+                healthy = await provider.health()
 
                 if not healthy:
                     logger.warning(

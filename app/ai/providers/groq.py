@@ -47,26 +47,25 @@ class GroqProvider(BaseAIProvider):
             + "\n\n[Content truncated.]"
         )
 
-    # ==========================================================
-    # HEALTH CHECK
-    # ==========================================================
+# ==========================================================
+# HEALTH CHECK
+# ==========================================================
 
-    async def health_check(
-        self,
-    ) -> bool:
+async def health(
+    self,
+) -> bool:
 
-        try:
+    try:
 
-            await self.generate(
-                prompt="Reply ONLY with OK",
-                max_tokens=5,
-            )
+        await self.generate(
+            prompt="Reply ONLY with OK",
+            max_tokens=5,
+        )
 
-            return True
+        return True
 
-        except Exception:
-
-            return False
+    except Exception:
+        return False
 
     # ==========================================================
     # GENERATE
