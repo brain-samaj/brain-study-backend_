@@ -83,6 +83,10 @@ class StudyMaterialListItem(BaseModel):
 
     title: str
 
+    description: str | None
+
+    original_filename: str
+
     file_type: MaterialType
 
     file_size: int
