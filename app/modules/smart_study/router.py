@@ -7,7 +7,7 @@ from fastapi import Depends
 from fastapi import HTTPException
 from fastapi import status
 
-from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database.async_session import get_async_db
 from app.modules.auth.dependencies import get_current_user
@@ -37,7 +37,7 @@ router = APIRouter(
 
 
 def get_service(
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_async_db),
 ) -> SmartStudyService:
 
     repository = SmartStudyRepository(db)

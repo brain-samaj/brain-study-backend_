@@ -17,7 +17,7 @@ router = APIRouter(
 
 @router.get("/")
 async def get_dashboard(
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_async_db),
     current_user: User = Depends(get_current_user),
 ):
     material_repository = StudyMaterialRepository(db)

@@ -50,7 +50,7 @@ router = APIRouter(
 
 
 def get_service(
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_async_db),
 ) -> StudyMaterialService:
 
     material_repository = StudyMaterialRepository(db)
