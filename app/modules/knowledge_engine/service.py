@@ -1,21 +1,13 @@
 from __future__ import annotations
 
-import json
 import time
 from pathlib import Path
 from uuid import UUID
 
 from app.ai.client import AIClient
 
-from app.modules.knowledge_engine.models import (
-    KnowledgeSource,
-    KnowledgeStatus,
-)
-
-from app.modules.knowledge_engine.repository import (
-    KnowledgeRepository,
-)
-
+from app.modules.knowledge_engine.models import KnowledgeSource
+from app.modules.knowledge_engine.repository import KnowledgeRepository
 from app.modules.knowledge_engine.schemas import (
     GlossaryItem,
     KnowledgeCreate,
@@ -25,37 +17,19 @@ from app.modules.knowledge_engine.schemas import (
     SampleQuestion,
 )
 
-from app.modules.study_materials.models import (
-    ProcessingStatus,
-)
-
-from app.modules.study_materials.repository import (
-    StudyMaterialRepository,
-)
+from app.modules.study_materials.models import ProcessingStatus
+from app.modules.study_materials.repository import StudyMaterialRepository
 
 
 class KnowledgeEngineService:
     """
-    Brain Study Knowledge Engine
+    Brain Study Knowledge Engine.
 
-    Responsibilities
-    ----------------
-    ✓ Extract text from uploaded study materials
-
-    ✓ Generate structured knowledge using AI
-
-    ✓ Save processed knowledge
-
-    ✓ Provide a single source of truth for:
-
-        • Exams
-        • Flashcards
-        • Summaries
-        • Smart Study
-        • Future AI Tutor
-
-    This is the ONLY service allowed to communicate
-    with AI providers.
+    Responsible for:
+    - Extracting text
+    - Generating structured knowledge
+    - Saving knowledge
+    - Feeding exams, flashcards, summaries and smart study
     """
 
     def __init__(
@@ -67,15 +41,9 @@ class KnowledgeEngineService:
     ) -> None:
 
         self.repository = repository
-        self.study_material_repository = (
-            study_material_repository
-        )
-
+        self.study_material_repository = study_material_repository
         self.ai = ai_client
 
-    # ==========================================================
-    # INTERNAL HELPERS
-    # ==========================================================
 
     async def _load_material(
         self,
@@ -83,7 +51,7 @@ class KnowledgeEngineService:
     ):
 
         material = await self.study_material_repository.get(
-            material_id,
+            material_id
         )
 
         if material is None:
@@ -92,6 +60,7 @@ class KnowledgeEngineService:
             )
 
         return material
+
 
     async def _mark_processing(
         self,
@@ -103,10 +72,9 @@ class KnowledgeEngineService:
         )
 
         await self.study_material_repository._db.commit()
+        await self.study_material_repository._db.refresh(material)
 
-        await self.study_material_repository._db.refresh(
-            material,
-        )
+
 
     async def _mark_ready(
         self,
@@ -120,10 +88,9 @@ class KnowledgeEngineService:
         material.extraction_error = None
 
         await self.study_material_repository._db.commit()
+        await self.study_material_repository._db.refresh(material)
 
-        await self.study_material_repository._db.refresh(
-            material,
-        )
+
 
     async def _mark_failed(
         self,
@@ -138,49 +105,21 @@ class KnowledgeEngineService:
         material.extraction_error = str(error)
 
         await self.study_material_repository._db.commit()
-
-        await self.study_material_repository._db.refresh(
-            material,
-        )
-
-    def _safe_list(
-        self,
-        value,
-    ):
-
-        if value is None:
-            return []
-
-        return value
+        await self.study_material_repository._db.refresh(material)
 
 
-    # ==========================================================
-    # TEXT EXTRACTION
-    # ==========================================================
 
     async def _extract_text(
         self,
         material,
     ) -> str:
-        """
-        Extract plain text from a study material.
 
-        Supports:
-            • PDF
-            • DOCX
-            • PPTX
-            • TXT
-            • Markdown
-            • Images (future OCR)
-            • Topic materials
-        """
-
-        # Already extracted
         if (
-            material.extracted_text is not None
+            material.extracted_text
             and material.extracted_text.strip()
         ):
             return material.extracted_text
+
 
         path = Path(material.storage_path)
 
@@ -189,13 +128,11 @@ class KnowledgeEngineService:
                 f"Missing uploaded file: {path}"
             )
 
+
         suffix = path.suffix.lower()
 
         text = ""
 
-        # ------------------------------------------------------
-        # TXT / MD
-        # ------------------------------------------------------
 
         if suffix in {".txt", ".md"}:
 
@@ -204,89 +141,66 @@ class KnowledgeEngineService:
                 errors="ignore",
             )
 
-        # ------------------------------------------------------
-        # PDF
-        # ------------------------------------------------------
 
         elif suffix == ".pdf":
 
-            try:
-                from pypdf import PdfReader
+            from pypdf import PdfReader
 
-                reader = PdfReader(str(path))
+            reader = PdfReader(str(path))
 
-                pages = []
+            pages = []
 
-                for page in reader.pages:
+            for page in reader.pages:
+                pages.append(
+                    page.extract_text() or ""
+                )
 
-                    pages.append(
-                        page.extract_text() or ""
-                    )
+            text = "\n".join(pages)
 
-                text = "\n".join(pages)
+            material.page_count = len(
+                reader.pages
+            )
 
-                material.page_count = len(reader.pages)
-
-            except Exception as exc:
-                raise RuntimeError(
-                    "Unable to extract PDF."
-                ) from exc
-
-        # ------------------------------------------------------
-        # DOCX
-        # ------------------------------------------------------
 
         elif suffix == ".docx":
 
-            try:
-                from docx import Document
+            from docx import Document
 
-                document = Document(str(path))
+            document = Document(
+                str(path)
+            )
 
-                text = "\n".join(
-                    paragraph.text
-                    for paragraph in document.paragraphs
-                )
+            text = "\n".join(
+                p.text
+                for p in document.paragraphs
+            )
 
-            except Exception as exc:
-                raise RuntimeError(
-                    "Unable to extract DOCX."
-                ) from exc
-
-        # ------------------------------------------------------
-        # PPTX
-        # ------------------------------------------------------
 
         elif suffix == ".pptx":
 
-            try:
-                from pptx import Presentation
+            from pptx import Presentation
 
-                presentation = Presentation(str(path))
+            presentation = Presentation(
+                str(path)
+            )
 
-                slides = []
+            slides = []
 
-                for slide in presentation.slides:
+            for slide in presentation.slides:
 
-                    for shape in slide.shapes:
+                for shape in slide.shapes:
 
-                        if hasattr(shape, "text"):
-                            slides.append(shape.text)
+                    if hasattr(shape,"text"):
+                        slides.append(
+                            shape.text
+                        )
 
-                text = "\n".join(slides)
+            text = "\n".join(slides)
 
-                material.page_count = len(
-                    presentation.slides
-                )
+            material.page_count = len(
+                presentation.slides
+            )
 
-            except Exception as exc:
-                raise RuntimeError(
-                    "Unable to extract PPTX."
-                ) from exc
-
-        # ------------------------------------------------------
-        # IMAGES
-        # ------------------------------------------------------
 
         elif suffix in {
             ".png",
@@ -297,8 +211,9 @@ class KnowledgeEngineService:
             ".webp",
         }:
 
-            # OCR will be implemented later.
+            # OCR will be added later
             text = ""
+
 
         else:
 
@@ -306,7 +221,9 @@ class KnowledgeEngineService:
                 f"Unsupported file format: {suffix}"
             )
 
+
         text = text.strip()
+
 
         material.extracted_text = text
 
@@ -316,17 +233,16 @@ class KnowledgeEngineService:
             else 0
         )
 
-        await self.study_material_repository._db.commit()
 
-        await self.study_material_repository._db.refresh(
-            material,
-        )
+        await self.study_material_repository._db.commit()
+        await self.study_material_repository._db.refresh(material)
+
 
         return text
 
 
     # ==========================================================
-    # BUILD KNOWLEDGE FROM MATERIAL
+    # BUILD KNOWLEDGE
     # ==========================================================
 
     async def build_from_material(
@@ -335,159 +251,186 @@ class KnowledgeEngineService:
         material_id: UUID,
     ) -> KnowledgeSource:
 
+
         existing = await self.repository.get_by_material(
-            material_id,
+            material_id
         )
 
-        if existing is not None:
+        if existing:
             return existing
 
+
         material = await self._load_material(
-            material_id,
+            material_id
         )
 
+
         await self._mark_processing(
-            material,
+            material
         )
+
 
         try:
 
             extracted_text = await self._extract_text(
-                material,
+                material
             )
 
-            if not extracted_text.strip():
+
+            if not extracted_text:
 
                 raise ValueError(
-                    "No readable text could be extracted from the uploaded material."
+                    "No readable text extracted."
                 )
+
 
             started = time.perf_counter()
 
+
             prompt = f"""
-You are Brain Study's Knowledge Engine.
+You are Brain Study Knowledge Engine.
 
-Analyse the following study material and return ONLY valid JSON.
+Analyze this study material.
 
-Required JSON format:
+Return ONLY valid JSON.
+
+Format:
 
 {{
-    "title": "...",
-    "summary": "...",
-    "topics":[
-        {{
-            "title":"...",
-            "content":"...",
-            "keywords":["..."],
-            "difficulty":"easy"
-        }}
-    ],
-    "glossary":[
-        {{
-            "term":"...",
-            "definition":"..."
-        }}
-    ],
-    "learning_objectives":[
-        {{
-            "objective":"..."
-        }}
-    ],
-    "key_points":[
-        "..."
-    ],
-    "sample_questions":[
-        {{
-            "question":"...",
-            "answer":"..."
-        }}
-    ]
+"title":"",
+"summary":"",
+"topics":[
+ {{
+"title":"",
+"content":"",
+"keywords":[],
+"difficulty":""
+}}
+],
+"glossary":[
+ {{
+"term":"",
+"definition":""
+}}
+],
+"learning_objectives":[
+ {{
+"objective":""
+}}
+],
+"key_points":[],
+"sample_questions":[
+ {{
+"question":"",
+"answer":""
+}}
+]
 }}
 
-Study Material:
+Material:
 
 {extracted_text}
 """
+
 
             response = await self.ai.generate_json(
                 prompt=prompt,
                 temperature=0.2,
             )
 
+
             elapsed = int(
                 (
-                    time.perf_counter() - started
+                    time.perf_counter()
+                    - started
                 )
                 * 1000
             )
 
+
             knowledge = await self.repository.create(
                 KnowledgeCreate(
+
                     material_id=material.id,
+
                     title=response.get(
                         "title",
-                        material.title,
+                        material.title
                     ),
+
                     summary=response.get(
                         "summary",
-                        "",
+                        ""
                     ),
+
                     knowledge=response,
+
                     topics=[
-                        KnowledgeTopic(**topic)
-                        for topic in response.get(
+                        KnowledgeTopic(**item)
+                        for item in response.get(
                             "topics",
-                            [],
+                            []
                         )
                     ],
+
                     glossary=[
                         GlossaryItem(**item)
                         for item in response.get(
                             "glossary",
-                            [],
+                            []
                         )
                     ],
+
                     learning_objectives=[
                         LearningObjective(**item)
                         for item in response.get(
                             "learning_objectives",
-                            [],
+                            []
                         )
                     ],
+
                     key_points=response.get(
                         "key_points",
-                        [],
+                        []
                     ),
+
                     sample_questions=[
                         SampleQuestion(**item)
                         for item in response.get(
                             "sample_questions",
-                            [],
+                            []
                         )
                     ],
+
                     total_tokens=0,
+
                     ai_provider="Brain AI",
+
                     ai_model="default",
+
                     processing_time_ms=elapsed,
+
                     is_cached=False,
                 )
             )
 
+
             await self._mark_ready(
-                material,
+                material
             )
 
+
             return knowledge
+
 
         except Exception as exc:
 
             await self._mark_failed(
                 material,
-                exc,
+                exc
             )
 
             raise
-
 
 
     # ==========================================================
@@ -500,16 +443,18 @@ Study Material:
         material_id: UUID,
     ) -> KnowledgeSource:
         """
-        Force regeneration of knowledge for a study material.
+        Force regeneration of knowledge
+        for a study material.
         """
 
         await self.repository.delete(
-            material_id,
+            material_id
         )
 
         return await self.build_from_material(
-            material_id=material_id,
+            material_id=material_id
         )
+
 
     # ==========================================================
     # GET KNOWLEDGE
@@ -522,8 +467,9 @@ Study Material:
     ) -> KnowledgeSource | None:
 
         return await self.repository.get_by_material(
-            material_id,
+            material_id
         )
+
 
     # ==========================================================
     # UPDATE KNOWLEDGE
@@ -541,6 +487,7 @@ Study Material:
             payload,
         )
 
+
     # ==========================================================
     # DELETE KNOWLEDGE
     # ==========================================================
@@ -552,8 +499,9 @@ Study Material:
     ) -> bool:
 
         return await self.repository.delete(
-            material_id,
+            material_id
         )
+
 
     # ==========================================================
     # CHECK CACHE
@@ -566,8 +514,9 @@ Study Material:
     ) -> bool:
 
         return await self.repository.exists(
-            material_id,
+            material_id
         )
+
 
     # ==========================================================
     # EXPORT KNOWLEDGE
@@ -580,30 +529,265 @@ Study Material:
     ) -> dict:
 
         knowledge = await self.repository.get_by_material(
-            material_id,
+            material_id
         )
 
+
         if knowledge is None:
+
             raise ValueError(
                 "Knowledge has not been generated."
             )
 
+
         return {
-            "id": str(knowledge.id),
-            "material_id": str(knowledge.material_id),
+
+            "id": str(
+                knowledge.id
+            ),
+
+            "material_id": str(
+                knowledge.material_id
+            ),
+
             "title": knowledge.title,
+
             "summary": knowledge.summary,
+
             "knowledge": knowledge.knowledge,
+
             "topics": knowledge.topics,
+
             "glossary": knowledge.glossary,
-            "learning_objectives": knowledge.learning_objectives,
-            "key_points": knowledge.key_points,
-            "sample_questions": knowledge.sample_questions,
-            "status": knowledge.status.value,
-            "cached": knowledge.is_cached,
-            "provider": knowledge.ai_provider,
-            "model": knowledge.ai_model,
-            "tokens": knowledge.total_tokens,
-            "processing_time_ms": knowledge.processing_time_ms,
+
+            "learning_objectives":
+                knowledge.learning_objectives,
+
+            "key_points":
+                knowledge.key_points,
+
+            "sample_questions":
+                knowledge.sample_questions,
+
+            "status":
+                knowledge.status.value,
+
+            "cached":
+                knowledge.is_cached,
+
+            "provider":
+                knowledge.ai_provider,
+
+            "model":
+                knowledge.ai_model,
+
+            "tokens":
+                knowledge.total_tokens,
+
+            "processing_time_ms":
+                knowledge.processing_time_ms,
         }
 
+
+    # ==========================================================
+    # HEALTH / DEBUG HELPERS
+    # ==========================================================
+
+    async def get_processing_status(
+        self,
+        *,
+        material_id: UUID,
+    ) -> dict:
+
+        material = await self.study_material_repository.get(
+            material_id
+        )
+
+        if material is None:
+            raise ValueError(
+                "Study material not found."
+            )
+
+        knowledge = await self.repository.get_by_material(
+            material_id
+        )
+
+        return {
+            "material_id": str(material.id),
+            "processing_status": (
+                material.processing_status.value
+                if material.processing_status
+                else None
+            ),
+            "has_knowledge": knowledge is not None,
+            "word_count": material.word_count,
+            "page_count": material.page_count,
+            "error": material.extraction_error,
+        }
+
+
+    # ==========================================================
+    # REBUILD KNOWLEDGE SAFELY
+    # ==========================================================
+
+    async def rebuild(
+        self,
+        *,
+        material_id: UUID,
+    ) -> KnowledgeSource:
+
+        material = await self._load_material(
+            material_id
+        )
+
+        await self.repository.delete(
+            material_id
+        )
+
+        material.extracted_text = ""
+        material.extraction_error = None
+        material.word_count = 0
+
+        await self.study_material_repository._db.commit()
+
+        return await self.build_from_material(
+            material_id=material_id
+        )
+
+
+    # ==========================================================
+    # SEARCH KNOWLEDGE CONTENT
+    # ==========================================================
+
+    async def search(
+        self,
+        *,
+        material_id: UUID,
+        keyword: str,
+    ) -> dict:
+
+        knowledge = await self.repository.get_by_material(
+            material_id
+        )
+
+        if knowledge is None:
+
+            raise ValueError(
+                "Knowledge not available."
+            )
+
+
+        keyword = keyword.lower()
+
+
+        matches = []
+
+
+        searchable = {
+
+            "summary":
+                knowledge.summary,
+
+            "topics":
+                knowledge.topics,
+
+            "key_points":
+                knowledge.key_points,
+
+            "glossary":
+                knowledge.glossary,
+
+        }
+
+
+        for section, value in searchable.items():
+
+            if keyword in str(value).lower():
+
+                matches.append(
+                    section
+                )
+
+
+        return {
+            "keyword": keyword,
+            "matches": matches,
+        }
+
+
+    # ==========================================================
+    # SERIALIZED KNOWLEDGE EXPORT
+    # ==========================================================
+
+    async def export_summary(
+        self,
+        *,
+        material_id: UUID,
+    ) -> dict:
+
+        knowledge = await self.repository.get_by_material(
+            material_id
+        )
+
+        if knowledge is None:
+
+            raise ValueError(
+                "Knowledge has not been generated."
+            )
+
+
+        return {
+            "title": knowledge.title,
+
+            "summary": knowledge.summary,
+
+            "topics": [
+                {
+                    "title": topic.get("title"),
+                    "content": topic.get("content"),
+                    "difficulty": topic.get("difficulty"),
+                }
+                for topic in (
+                    knowledge.topics or []
+                )
+            ],
+
+            "key_points": (
+                knowledge.key_points or []
+            ),
+
+            "sample_questions": [
+                {
+                    "question": item.get("question"),
+                    "answer": item.get("answer"),
+                }
+                for item in (
+                    knowledge.sample_questions or []
+                )
+            ],
+        }
+
+
+    # ==========================================================
+    # VALIDATE KNOWLEDGE EXISTENCE
+    # ==========================================================
+
+    async def validate(
+        self,
+        *,
+        material_id: UUID,
+    ) -> bool:
+
+        knowledge = await self.repository.get_by_material(
+            material_id
+        )
+
+        if knowledge is None:
+            return False
+
+
+        return bool(
+            knowledge.summary
+            or knowledge.topics
+            or knowledge.key_points
+        )
