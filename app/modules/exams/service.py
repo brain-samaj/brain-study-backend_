@@ -38,17 +38,19 @@ class ExamService:
         request: CreateExamRequest,
     ) -> ExamSession:
         """
-        Create an exam directly from the stored study material.
+        Create an exam from a stored study material.
         """
 
-study_material = await self._repository.get_study_material(material_id)
+        study_material = await self._repository.get_study_material(
+            material_id
+        )
 
-        if material is None:
+        if study_material is None:
             raise ValueError("Study material not found.")
 
         study_content = (
-            material.extracted_text
-            or material.description
+            study_material.extracted_text
+            or study_material.description
             or ""
         ).strip()
 
