@@ -40,9 +40,9 @@ class StudyGuideService:
         education_level: str,
     ):
 
-        source = self.repository.get_by_study_material(
-            study_material_id,
-        )
+source = await self.repository.get_by_material(
+    material_id
+)
 
         if source is None:
             raise HTTPException(
