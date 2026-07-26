@@ -2,10 +2,16 @@ from __future__ import annotations
 
 import json
 import logging
+import re
 from typing import Any
 
-from app.ai.base import AIProviderError, AIProviderUnavailableError
+from app.ai.base import (
+    AIProviderError,
+    AIProviderUnavailableError,
+)
+
 from app.ai.factory import AIProviderFactory
+
 
 logger = logging.getLogger(__name__)
 
@@ -14,12 +20,10 @@ class AIClient:
     """
     Enterprise AI client.
 
-    Responsibilities
-    ----------------
+    Responsibilities:
     - Hide provider implementation details.
-    - Select the primary provider through AIProviderFactory.
-    - Automatically fall back to the next provider on failure.
-    - Return only parsed data to application services.
+    - Handle provider fallback.
+    - Return parsed JSON safely.
     """
 
     def __init__(
@@ -27,6 +31,7 @@ class AIClient:
         factory: AIProviderFactory | None = None,
     ) -> None:
         self._factory = factory or AIProviderFactory()
+
 
     async def generate(
         self,
@@ -41,20 +46,23 @@ class AIClient:
         last_error: Exception | None = None
 
         for provider in self._factory.providers:
+
             try:
                 healthy = await provider.health()
 
                 if not healthy:
                     logger.warning(
-                        "Skipping unhealthy AI provider: %s",
+                        "Skipping unhealthy provider: %s",
                         provider.name,
                     )
                     continue
 
+
                 logger.info(
-                    "Generating response with provider: %s",
+                    "Using AI provider: %s",
                     provider.name,
                 )
+
 
                 return await provider.generate(
                     prompt=prompt,
@@ -64,22 +72,26 @@ class AIClient:
                     response_format=response_format,
                 )
 
+
             except Exception as exc:
                 last_error = exc
 
                 logger.exception(
-                    "Provider '%s' failed. Trying next provider.",
+                    "Provider failed: %s",
                     provider.name,
                 )
+
 
         if last_error:
             raise AIProviderUnavailableError(
                 "All AI providers failed."
             ) from last_error
 
+
         raise AIProviderUnavailableError(
-            "No AI providers are available."
+            "No AI providers available."
         )
+
 
     async def generate_json(
         self,
@@ -100,30 +112,57 @@ class AIClient:
             },
         )
 
-        logger.info("Raw AI response:\n%s", raw)
 
-        cleaned = raw.strip()
+        logger.info(
+            "RAW AI RESPONSE: %r",
+            raw,
+        )
 
-        if cleaned.startswith("```"):
-            lines = cleaned.splitlines()
 
-            if lines and lines[0].startswith("```"):
-                lines = lines[1:]
+        cleaned = self._clean_json(raw)
 
-            if lines and lines[-1].strip() == "```":
-                lines = lines[:-1]
-
-            cleaned = "\n".join(lines).strip()
 
         try:
             return json.loads(cleaned)
 
-        except json.JSONDecodeError as exc:
-            logger.exception("AI returned invalid JSON.")
 
-            logger.error("RAW RESPONSE:\n%s", raw)
-            logger.error("CLEANED RESPONSE:\n%s", cleaned)
+        except json.JSONDecodeError as exc:
+
+            logger.exception(
+                "AI returned invalid JSON after cleaning."
+            )
 
             raise AIProviderError(
-                "AI provider returned malformed JSON."
+                f"Malformed AI JSON.\nRaw response: {raw!r}"
             ) from exc
+
+
+
+    def _clean_json(
+        self,
+        text: str,
+    ) -> str:
+
+        """
+        Remove markdown code fences from AI JSON.
+        """
+
+        text = text.strip()
+
+
+        # Remove ```json ... ```
+        text = re.sub(
+            r"^```(?:json)?",
+            "",
+            text,
+            flags=re.IGNORECASE,
+        )
+
+        text = re.sub(
+            r"```$",
+            "",
+            text,
+        )
+
+
+        return text.strip()
