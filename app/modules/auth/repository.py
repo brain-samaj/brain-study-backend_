@@ -3,49 +3,104 @@ from __future__ import annotations
 from uuid import UUID
 
 from sqlalchemy import select
-from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.modules.auth.models import User
 
 
 class AuthRepository:
     """
-    Repository responsible for persistence of User entities.
+    Async repository responsible for User persistence.
     """
 
-    def __init__(self, db: Session) -> None:
+    def __init__(self, db: AsyncSession) -> None:
         self.db = db
 
-    def get_by_id(self, user_id: UUID) -> User | None:
-        stmt = select(User).where(User.id == user_id)
-        return self.db.scalar(stmt)
+    async def get_by_id(
+        self,
+        user_id: UUID,
+    ) -> User | None:
 
-    def get_by_email(self, email: str) -> User | None:
+        stmt = select(User).where(
+            User.id == user_id
+        )
+
+        result = await self.db.execute(stmt)
+
+        return result.scalar_one_or_none()
+
+
+    async def get_by_email(
+        self,
+        email: str,
+    ) -> User | None:
+
         stmt = (
             select(User)
-            .where(User.email == email.lower().strip())
-            .where(User.deleted_at.is_(None))
+            .where(
+                User.email == email.lower().strip()
+            )
+            .where(
+                User.deleted_at.is_(None)
+            )
         )
-        return self.db.scalar(stmt)
 
-    def email_exists(self, email: str) -> bool:
-        return self.get_by_email(email) is not None
+        result = await self.db.execute(stmt)
 
-    def create(self, user: User) -> User:
+        return result.scalar_one_or_none()
+
+
+    async def email_exists(
+        self,
+        email: str,
+    ) -> bool:
+
+        user = await self.get_by_email(email)
+
+        return user is not None
+
+
+    async def create(
+        self,
+        user: User,
+    ) -> User:
+
         self.db.add(user)
-        self.db.commit()
-        self.db.refresh(user)
+
+        await self.db.commit()
+
+        await self.db.refresh(user)
+
         return user
 
-    def update(self, user: User) -> User:
+
+    async def update(
+        self,
+        user: User,
+    ) -> User:
+
         self.db.add(user)
-        self.db.commit()
-        self.db.refresh(user)
+
+        await self.db.commit()
+
+        await self.db.refresh(user)
+
         return user
 
-    def save(self, user: User) -> User:
-        return self.update(user)
 
-    def delete(self, user: User) -> None:
-        self.db.delete(user)
-        self.db.commit()
+    async def save(
+        self,
+        user: User,
+    ) -> User:
+
+        return await self.update(user)
+
+
+    async def delete(
+        self,
+        user: User,
+    ) -> None:
+
+        await self.db.delete(user)
+
+        await self.db.commit()

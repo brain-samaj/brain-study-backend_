@@ -2,15 +2,23 @@
 Brain Study Backend Pre-Deployment Checker
 
 Validates the backend before deployment.
-Compatible with pyproject.toml projects.
+
+Compatible with:
+- FastAPI
+- SQLAlchemy AsyncSession
+- PostgreSQL asyncpg
+- Pydantic Settings
 """
 
 from __future__ import annotations
 
+import asyncio
 import importlib
-import os
 import sys
 from pathlib import Path
+
+from sqlalchemy import text
+
 
 PASS = "✅"
 FAIL = "❌"
@@ -22,12 +30,15 @@ warnings: list[str] = []
 
 def check(name: str, fn):
     print(f"\nChecking: {name}")
+
     try:
         fn()
         print(f"{PASS} {name}")
+
     except Exception as e:
         print(f"{FAIL} {name}")
         print(e)
+
         errors.append(
             {
                 "check": name,
@@ -41,36 +52,45 @@ def python_version():
 
 
 def required_files():
+
     required = [
         "pyproject.toml",
         "app/main.py",
         "app/core/config.py",
         "app/database/base.py",
         "app/database/session.py",
+        "app/database/async_session.py",
     ]
 
     for file in required:
         if not Path(file).exists():
-            raise FileNotFoundError(f"Missing {file}")
+            raise FileNotFoundError(
+                f"Missing {file}"
+            )
 
 
 def dependencies():
+
     packages = [
         "fastapi",
         "sqlalchemy",
         "uvicorn",
         "pydantic",
+        "asyncpg",
     ]
 
     for package in packages:
         importlib.import_module(package)
 
 
+
 def imports():
+
     modules = [
         "app.main",
         "app.database.base",
         "app.database.session",
+        "app.database.async_session",
         "app.ai.analyzers.models",
     ]
 
@@ -78,52 +98,95 @@ def imports():
         importlib.import_module(module)
 
 
+
 def fastapi_startup():
+
     from app.main import app
 
     if app is None:
-        raise RuntimeError("FastAPI application not found.")
+        raise RuntimeError(
+            "FastAPI application not found."
+        )
+
 
 
 def routes():
+
     from app.main import app
 
     registered = []
 
     for route in app.routes:
-        path = getattr(route, "path", None)
+
+        path = getattr(
+            route,
+            "path",
+            None,
+        )
 
         if path:
             registered.append(path)
 
-    if not registered:
-        raise RuntimeError("No API routes registered.")
 
-    print(f"Found {len(registered)} routes.")
+    if not registered:
+        raise RuntimeError(
+            "No API routes registered."
+        )
+
+
+    print(
+        f"Found {len(registered)} routes."
+    )
+
 
 
 def environment():
-    required = [
-        "DATABASE_URL",
-    ]
 
-    for key in required:
-        if not os.getenv(key):
-            warnings.append(f"{key} missing")
+    from app.core.config import settings
+
+    if not settings.DATABASE_URL:
+        warnings.append(
+            "DATABASE_URL missing"
+        )
+
 
 
 def database():
-    from app.database.session import engine
 
-    with engine.connect() as conn:
-        conn.exec_driver_sql("SELECT 1")
+    from app.database.async_session import async_engine
+
+
+    async def test_connection():
+
+        async with async_engine.connect() as conn:
+
+            await conn.execute(
+                text("SELECT 1")
+            )
+
+
+    asyncio.run(test_connection())
+
 
 
 def models():
-    importlib.import_module("app.database.models")
+
+    modules = [
+
+        "app.modules.auth.models",
+        "app.modules.study_materials.models",
+        "app.modules.exams.models",
+        "app.modules.knowledge_engine.models",
+
+    ]
+
+    for module in modules:
+        importlib.import_module(module)
+
 
 
 def main():
+
     print(
         """
 ==================================
@@ -132,20 +195,60 @@ Brain Study Deployment Checker
 """
     )
 
+
     checks = [
-        ("Python version", python_version),
-        ("Required files", required_files),
-        ("Dependencies", dependencies),
-        ("Module imports", imports),
-        ("FastAPI startup", fastapi_startup),
-        ("API routes", routes),
-        ("Environment", environment),
-        ("Database connection", database),
-        ("Database models", models),
+
+        (
+            "Python version",
+            python_version,
+        ),
+
+        (
+            "Required files",
+            required_files,
+        ),
+
+        (
+            "Dependencies",
+            dependencies,
+        ),
+
+        (
+            "Module imports",
+            imports,
+        ),
+
+        (
+            "FastAPI startup",
+            fastapi_startup,
+        ),
+
+        (
+            "API routes",
+            routes,
+        ),
+
+        (
+            "Environment",
+            environment,
+        ),
+
+        (
+            "Database connection",
+            database,
+        ),
+
+        (
+            "Database models",
+            models,
+        ),
+
     ]
+
 
     for name, fn in checks:
         check(name, fn)
+
 
     print(
         """
@@ -155,19 +258,40 @@ Deployment Report
 """
     )
 
+
     if warnings:
+
         print("Warnings:")
+
         for warning in warnings:
-            print(f"{WARN} {warning}")
+            print(
+                f"{WARN} {warning}"
+            )
+
 
     if errors:
-        print("\nErrors found:")
+
+        print(
+            "\nErrors found:"
+        )
+
         for error in errors:
-            print(f"{FAIL} {error['check']}")
-            print(f"    {error['error']}")
+
+            print(
+                f"{FAIL} {error['check']}"
+            )
+
+            print(
+                f"    {error['error']}"
+            )
+
         sys.exit(1)
 
-    print(f"\n{PASS} Backend looks ready for deployment.")
+
+    print(
+        f"\n{PASS} Backend looks ready for deployment."
+    )
+
 
 
 if __name__ == "__main__":
