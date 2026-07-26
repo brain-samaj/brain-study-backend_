@@ -22,15 +22,19 @@ async def get_dashboard(
 ):
     material_repository = StudyMaterialRepository(db)
 
-    materials = await material_repository.list(
+    materials = await material_repository.list_for_owner(
         owner_id=current_user.id,
         skip=0,
         limit=5,
     )
 
+    total_materials = await material_repository.count_for_owner(
+        current_user.id,
+    )
+
     return {
         "stats": {
-            "materials": len(materials),
+            "materials": total_materials,
             "study_kits": 0,
             "flashcards": 0,
             "progress": 0,
