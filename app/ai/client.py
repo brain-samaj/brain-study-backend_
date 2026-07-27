@@ -21,7 +21,7 @@ class AIClient:
     Responsibilities
     ----------------
     - Hide provider implementations.
-    - Automatically use Groq then Gemini.
+    - Automatically use configured providers.
     - Retry providers on failure.
     - Return clean text or JSON.
     """
@@ -45,9 +45,7 @@ class AIClient:
         last_error: Exception | None = None
 
         for provider in self._factory.providers:
-
             try:
-
                 healthy = await provider.health()
 
                 if not healthy:
@@ -109,16 +107,44 @@ class AIClient:
             },
         )
 
+        logger.info("=" * 80)
+        logger.info("RAW AI RESPONSE")
+        logger.info("=" * 80)
+        logger.info(raw)
+        logger.info("=" * 80)
+
         cleaned = self._extract_json(raw)
 
+        logger.info("=" * 80)
+        logger.info("CLEANED JSON")
+        logger.info("=" * 80)
+        logger.info(cleaned)
+        logger.info("=" * 80)
+
         try:
-            return json.loads(cleaned)
+            payload = json.loads(cleaned)
+
+            logger.info("=" * 80)
+            logger.info("PARSED JSON PAYLOAD")
+            logger.info("=" * 80)
+            logger.info(
+                json.dumps(
+                    payload,
+                    indent=2,
+                    ensure_ascii=False,
+                )
+            )
+            logger.info("=" * 80)
+
+            return payload
 
         except Exception as exc:
-
             logger.exception(
                 "Invalid JSON returned by AI."
             )
+
+            logger.error("RAW RESPONSE:\n%s", raw)
+            logger.error("CLEANED RESPONSE:\n%s", cleaned)
 
             raise AIProviderError(
                 f"AI returned invalid JSON.\n\n{raw}"
@@ -150,6 +176,7 @@ class AIClient:
         end = text.rfind("}")
 
         if start != -1 and end != -1:
-            return text[start:end + 1]
+            return text[start : end + 1]
 
         return text
+

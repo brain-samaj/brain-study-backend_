@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import logging
 import re
 from collections.abc import Iterable
 from typing import Any
@@ -10,12 +11,12 @@ from groq import AsyncGroq
 from app.ai.providers.base import BaseAIProvider
 from app.core.config import settings
 
+logger = logging.getLogger(__name__)
+
 
 class GroqProvider(BaseAIProvider):
     """
     Enterprise Groq Provider.
-
-    Compatible with AIClient.
     """
 
     name = "Groq"
@@ -23,9 +24,13 @@ class GroqProvider(BaseAIProvider):
     MAX_PROMPT_CHARS = 16000
 
     def __init__(self) -> None:
+        if not settings.GROQ_API_KEY:
+            raise ValueError("GROQ_API_KEY is missing.")
+
         self.client = AsyncGroq(
             api_key=settings.GROQ_API_KEY,
         )
+
         self.model = settings.GROQ_MODEL
 
     # ==========================================================
@@ -36,13 +41,10 @@ class GroqProvider(BaseAIProvider):
         if len(prompt) <= self.MAX_PROMPT_CHARS:
             return prompt
 
-        return (
-            prompt[: self.MAX_PROMPT_CHARS]
-            + "\n\n[Content truncated.]"
-        )
+        return prompt[: self.MAX_PROMPT_CHARS] + "\n\n[Content truncated.]"
 
     # ==========================================================
-    # HEALTH CHECK
+    # HEALTH
     # ==========================================================
 
     async def health(self) -> bool:
@@ -53,6 +55,7 @@ class GroqProvider(BaseAIProvider):
             )
             return True
         except Exception:
+            logger.exception("Groq health check failed.")
             return False
 
     # ==========================================================
@@ -65,31 +68,25 @@ class GroqProvider(BaseAIProvider):
         prompt: str,
         system_prompt: str | None = None,
         temperature: float = 0.2,
-        max_tokens: int = 2048,
+        max_tokens: int = 4096,
         response_format: dict[str, Any] | None = None,
     ) -> str:
+
         prompt = self._trim(prompt)
 
         system = (
             system_prompt
             or (
                 "You are Brain Study's AI engine.\n"
-                "Generate accurate educational content.\n"
-                "Follow every instruction exactly."
+                "Always follow the requested JSON schema exactly.\n"
+                "Never omit required fields.\n"
+                "Never wrap JSON in markdown."
             )
         )
 
-        if response_format:
-            system += (
-                "\n\nReturn ONLY valid JSON."
-                "\nDo not wrap it inside markdown."
-            )
-
-        response = await self.client.chat.completions.create(
-            model=self.model,
-            temperature=temperature,
-            max_tokens=max_tokens,
-            messages=[
+        kwargs: dict[str, Any] = {
+            "model": self.model,
+            "messages": [
                 {
                     "role": "system",
                     "content": system,
@@ -99,9 +96,20 @@ class GroqProvider(BaseAIProvider):
                     "content": prompt,
                 },
             ],
-        )
+            "temperature": temperature,
+            "max_tokens": max_tokens,
+        }
 
-        return response.choices[0].message.content.strip()
+        if response_format is not None:
+            kwargs["response_format"] = response_format
+
+        response = await self.client.chat.completions.create(**kwargs)
+
+        content = response.choices[0].message.content or ""
+
+        logger.info("RAW GROQ RESPONSE:\n%s", content)
+
+        return content.strip()
 
     # ==========================================================
     # JSON
@@ -111,11 +119,16 @@ class GroqProvider(BaseAIProvider):
         self,
         *,
         prompt: str,
+        system_prompt: str | None = None,
         temperature: float = 0.2,
-    ) -> dict:
+        max_tokens: int = 4096,
+    ) -> dict[str, Any]:
+
         text = await self.generate(
             prompt=prompt,
+            system_prompt=system_prompt,
             temperature=temperature,
+            max_tokens=max_tokens,
             response_format={
                 "type": "json_object",
             },
@@ -138,7 +151,9 @@ class GroqProvider(BaseAIProvider):
         end = text.rfind("}")
 
         if start != -1 and end != -1:
-            text = text[start : end + 1]
+            text = text[start:end + 1]
+
+        logger.info("CLEANED GROQ JSON:\n%s", text)
 
         return json.loads(text)
 
