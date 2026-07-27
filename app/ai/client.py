@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import logging
 import re
+import traceback
 from typing import Any
 
 from app.ai.base import (
@@ -46,7 +47,17 @@ class AIClient:
 
         for provider in self._factory.providers:
             try:
+                logger.info("=" * 80)
+                logger.info("Checking provider: %s", provider.name)
+                logger.info("=" * 80)
+
                 healthy = await provider.health()
+
+                logger.info(
+                    "Health check for %s: %s",
+                    provider.name,
+                    healthy,
+                )
 
                 if not healthy:
                     logger.warning(
@@ -69,7 +80,17 @@ class AIClient:
                 )
 
                 if response and str(response).strip():
+                    logger.info(
+                        "Provider %s generated %d characters.",
+                        provider.name,
+                        len(response),
+                    )
                     return str(response)
+
+                logger.warning(
+                    "Provider %s returned an empty response.",
+                    provider.name,
+                )
 
             except Exception as exc:
                 last_error = exc
@@ -79,9 +100,23 @@ class AIClient:
                     provider.name,
                 )
 
+                print("=" * 80)
+                print(f"PROVIDER FAILURE: {provider.name}")
+                traceback.print_exc()
+                print("=" * 80)
+
         if last_error is not None:
+            print("=" * 80)
+            print("LAST AI ERROR")
+            traceback.print_exception(
+                type(last_error),
+                last_error,
+                last_error.__traceback__,
+            )
+            print("=" * 80)
+
             raise AIProviderUnavailableError(
-                "All AI providers failed."
+                f"All AI providers failed. Last error: {repr(last_error)}"
             ) from last_error
 
         raise AIProviderUnavailableError(
@@ -143,8 +178,15 @@ class AIClient:
                 "Invalid JSON returned by AI."
             )
 
-            logger.error("RAW RESPONSE:\n%s", raw)
-            logger.error("CLEANED RESPONSE:\n%s", cleaned)
+            logger.error(
+                "RAW RESPONSE:\n%s",
+                raw,
+            )
+
+            logger.error(
+                "CLEANED RESPONSE:\n%s",
+                cleaned,
+            )
 
             raise AIProviderError(
                 f"AI returned invalid JSON.\n\n{raw}"
@@ -179,4 +221,3 @@ class AIClient:
             return text[start : end + 1]
 
         return text
-
