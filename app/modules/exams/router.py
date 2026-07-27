@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import traceback
 from uuid import UUID
 
 from fastapi import APIRouter
@@ -54,15 +55,13 @@ async def create_exam(
             request=request,
         )
 
-import traceback
+    except Exception as exc:
+        traceback.print_exc()
 
-except Exception as exc:
-    traceback.print_exc()
-
-    raise HTTPException(
-        status_code=400,
-        detail=str(exc),
-    ) from exc
+        raise HTTPException(
+            status_code=400,
+            detail=str(exc),
+        ) from exc
 
 
 # ============================================================
@@ -153,7 +152,7 @@ async def save_theory_answer(
 
 
 # ============================================================
-# SUBMIT
+# SUBMIT EXAM
 # ============================================================
 
 @router.post("/{session_id}/submit")
