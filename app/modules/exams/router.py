@@ -54,11 +54,15 @@ async def create_exam(
             request=request,
         )
 
-    except Exception as exc:
-        raise HTTPException(
-            status_code=400,
-            detail=str(exc),
-        ) from exc
+import traceback
+
+except Exception as exc:
+    traceback.print_exc()
+
+    raise HTTPException(
+        status_code=400,
+        detail=str(exc),
+    ) from exc
 
 
 # ============================================================
