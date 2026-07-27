@@ -15,15 +15,24 @@ class AIProviderFactory:
     """
     Enterprise AI Provider Factory.
 
-    Provider priority:
-        1. Groq
-        2. Gemini
+    Provider priority
+    -----------------
+    1. Gemini
+    2. Groq (fallback)
+
+    Gemini is always attempted first.
+
+    Groq is only used when:
+    - Gemini is unavailable
+    - Gemini health check fails
+    - Gemini request fails
+    - Gemini quota/token is exhausted
     """
 
     def __init__(self) -> None:
         self._providers: tuple[BaseAIProvider, ...] = (
-            GroqProvider(),
             GeminiProvider(),
+            GroqProvider(),
         )
 
     @property
@@ -32,11 +41,14 @@ class AIProviderFactory:
 
     async def get_primary_provider(self) -> BaseAIProvider:
         """
-        Returns the first healthy provider.
+        Returns the first healthy provider according
+        to configured priority.
 
-        Raises:
-            AIProviderUnavailableError
+        Priority:
+            1. Gemini
+            2. Groq
         """
+
         for provider in self._providers:
             try:
                 if await provider.health():
@@ -45,6 +57,7 @@ class AIProviderFactory:
                         provider.name,
                     )
                     return provider
+
             except Exception:
                 logger.exception(
                     "Health check failed for provider: %s",
@@ -65,6 +78,7 @@ class AIProviderFactory:
         Raises:
             AIProviderUnavailableError
         """
+
         provider_name = provider_name.lower()
 
         for provider in self._providers:

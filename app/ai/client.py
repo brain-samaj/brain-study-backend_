@@ -9,21 +9,21 @@ from app.ai.base import (
     AIProviderError,
     AIProviderUnavailableError,
 )
-
 from app.ai.factory import AIProviderFactory
-
 
 logger = logging.getLogger(__name__)
 
 
 class AIClient:
     """
-    Enterprise AI client.
+    Enterprise AI Client.
 
-    Responsibilities:
-    - Hide provider implementation details.
-    - Handle provider fallback.
-    - Return parsed JSON safely.
+    Responsibilities
+    ----------------
+    - Hide provider implementations.
+    - Automatically use Groq then Gemini.
+    - Retry providers on failure.
+    - Return clean text or JSON.
     """
 
     def __init__(
@@ -31,7 +31,6 @@ class AIClient:
         factory: AIProviderFactory | None = None,
     ) -> None:
         self._factory = factory or AIProviderFactory()
-
 
     async def generate(
         self,
@@ -48,6 +47,7 @@ class AIClient:
         for provider in self._factory.providers:
 
             try:
+
                 healthy = await provider.health()
 
                 if not healthy:
@@ -57,14 +57,12 @@ class AIClient:
                     )
                     continue
 
-
                 logger.info(
-                    "Using AI provider: %s",
+                    "Using provider: %s",
                     provider.name,
                 )
 
-
-                return await provider.generate(
+                response = await provider.generate(
                     prompt=prompt,
                     system_prompt=system_prompt,
                     temperature=temperature,
@@ -72,26 +70,25 @@ class AIClient:
                     response_format=response_format,
                 )
 
+                if response and str(response).strip():
+                    return str(response)
 
             except Exception as exc:
                 last_error = exc
 
                 logger.exception(
-                    "Provider failed: %s",
+                    "Provider %s failed.",
                     provider.name,
                 )
 
-
-        if last_error:
+        if last_error is not None:
             raise AIProviderUnavailableError(
                 "All AI providers failed."
             ) from last_error
 
-
         raise AIProviderUnavailableError(
-            "No AI providers available."
+            "No AI provider available."
         )
-
 
     async def generate_json(
         self,
@@ -112,45 +109,28 @@ class AIClient:
             },
         )
 
-
-        logger.info(
-            "RAW AI RESPONSE: %r",
-            raw,
-        )
-
-
-        cleaned = self._clean_json(raw)
-
+        cleaned = self._extract_json(raw)
 
         try:
             return json.loads(cleaned)
 
-
-        except json.JSONDecodeError as exc:
+        except Exception as exc:
 
             logger.exception(
-                "AI returned invalid JSON after cleaning."
+                "Invalid JSON returned by AI."
             )
 
             raise AIProviderError(
-                f"Malformed AI JSON.\nRaw response: {raw!r}"
+                f"AI returned invalid JSON.\n\n{raw}"
             ) from exc
 
-
-
-    def _clean_json(
+    def _extract_json(
         self,
         text: str,
     ) -> str:
 
-        """
-        Remove markdown code fences from AI JSON.
-        """
-
         text = text.strip()
 
-
-        # Remove ```json ... ```
         text = re.sub(
             r"^```(?:json)?",
             "",
@@ -164,5 +144,12 @@ class AIClient:
             text,
         )
 
+        text = text.strip()
 
-        return text.strip()
+        start = text.find("{")
+        end = text.rfind("}")
+
+        if start != -1 and end != -1:
+            return text[start:end + 1]
+
+        return text
