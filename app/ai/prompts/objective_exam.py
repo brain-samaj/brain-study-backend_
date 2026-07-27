@@ -4,11 +4,8 @@ Production Objective Exam Prompt.
 The AI MUST return ONLY valid JSON.
 
 No markdown.
-
 No explanations.
-
 No code fences.
-
 No additional text.
 """
 
@@ -70,13 +67,15 @@ Marks must be positive integers.
 
 Difficulty should match the requested level.
 
+Return ONLY a valid JSON object.
+
 ==============================
 Output JSON ONLY
 ==============================
 
-{
+{{
   "questions": [
-    {
+    {{
       "question_number": 1,
       "question": "...",
       "options": [
@@ -90,17 +89,15 @@ Output JSON ONLY
       "topic": "...",
       "difficulty": "...",
       "marks": 2
-    }
+    }}
   ]
-}
+}}
 
-Return ONLY valid JSON.
+IMPORTANT:
 
-No markdown.
-
-No comments.
-
-No code fences.
-
-No extra text.
+- Return ONLY the JSON object.
+- Do NOT wrap the JSON in markdown.
+- Do NOT include ```json.
+- Do NOT include explanations before or after the JSON.
+- The response MUST begin with {{ and end with }}.
 """
