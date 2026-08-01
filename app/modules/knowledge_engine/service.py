@@ -286,11 +286,11 @@ Return ONLY valid JSON.
 
 The JSON MUST follow this schema exactly.
 
-{
+{{
   "title": "",
   "summary": "",
 
-  "analysis": {
+  "analysis": {{
     "subject": "",
 
     "teaching_style": "",
@@ -346,39 +346,39 @@ The JSON MUST follow this schema exactly.
     "requires_code": false,
 
     "requires_memorization": false
-  },
+  }},
 
   "topics": [
-    {
+    {{
       "title": "",
       "content": "",
       "keywords": [],
       "difficulty": "Easy | Medium | Hard"
-    }
+    }}
   ],
 
   "glossary": [
     {
       "term": "",
       "definition": ""
-    }
+    }}
   ],
 
   "learning_objectives": [
-    {
+    {{
       "objective": ""
-    }
+    }}
   ],
 
   "key_points": [],
 
   "sample_questions": [
-    {
+    {{
       "question": "",
       "answer": ""
-    }
+    }}
   ]
-}
+}}
 
 Rules
 
