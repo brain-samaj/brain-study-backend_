@@ -68,7 +68,7 @@ class GroqProvider(BaseAIProvider):
         prompt: str,
         system_prompt: str | None = None,
         temperature: float = 0.2,
-        max_tokens: int = 4096,
+        max_tokens: int = 12000,
         response_format: dict[str, Any] | None = None,
     ) -> str:
 
@@ -121,7 +121,7 @@ class GroqProvider(BaseAIProvider):
         prompt: str,
         system_prompt: str | None = None,
         temperature: float = 0.2,
-        max_tokens: int = 4096,
+        max_tokens: int = 12000,
     ) -> dict[str, Any]:
 
         text = await self.generate(
@@ -155,7 +155,17 @@ class GroqProvider(BaseAIProvider):
 
         logger.info("CLEANED GROQ JSON:\n%s", text)
 
-        return json.loads(text)
+        try:
+            return json.loads(text)
+
+        except json.JSONDecodeError:
+            logger.error(
+                "Invalid JSON from Groq:\n%s",
+                text,
+            )
+            raise ValueError(
+                "AI returned invalid JSON response"
+            )
 
     # ==========================================================
     # EMBEDDINGS
