@@ -1,7 +1,6 @@
 from __future__ import annotations
 
-from datetime import UTC
-from datetime import datetime
+from datetime import UTC, datetime
 from uuid import UUID
 
 from app.ai.services.exam_generator import ExamGenerator
@@ -14,6 +13,7 @@ from app.modules.exams.models import (
 )
 from app.modules.exams.repository import ExamRepository
 from app.modules.exams.schemas import CreateExamRequest
+from app.modules.knowledge_engine.repository import KnowledgeRepository
 
 
 class ExamService:
@@ -25,9 +25,11 @@ class ExamService:
         self,
         *,
         repository: ExamRepository,
+        knowledge_repository: KnowledgeRepository,
         generator: ExamGenerator,
     ) -> None:
         self._repository = repository
+        self._knowledge_repository = knowledge_repository
         self._generator = generator
 
     async def create_exam(
@@ -38,26 +40,48 @@ class ExamService:
         request: CreateExamRequest,
     ) -> ExamSession:
         """
-        Create an exam from a stored study material.
+        Create an exam from the Knowledge Engine instead of raw material.
         """
 
-        study_material = await self._repository.get_study_material(
+        knowledge = await self._knowledge_repository.get_by_material(
             material_id
         )
 
-        if study_material is None:
-            raise ValueError("Study material not found.")
-
-        study_content = (
-            study_material.extracted_text
-            or study_material.description
-            or ""
-        ).strip()
-
-        if not study_content:
+        if knowledge is None:
             raise ValueError(
-                "Study material contains no extracted text."
+                "Knowledge has not been generated for this material."
             )
+
+        analysis = {}
+
+        if isinstance(knowledge.knowledge, dict):
+            analysis = knowledge.knowledge.get("analysis", {})
+
+        study_content = f"""
+TITLE:
+{knowledge.title}
+
+SUMMARY:
+{knowledge.summary}
+
+TOPICS:
+{knowledge.topics}
+
+KEY POINTS:
+{knowledge.key_points}
+
+GLOSSARY:
+{knowledge.glossary}
+
+LEARNING OBJECTIVES:
+{knowledge.learning_objectives}
+
+SAMPLE QUESTIONS:
+{knowledge.sample_questions}
+
+EDUCATIONAL ANALYSIS:
+{analysis}
+""".strip()
 
         generated = await self._generator.generate(
             exam_type=request.exam_type,
@@ -83,7 +107,6 @@ class ExamService:
         total_marks = 0
 
         for item in generated["questions"]:
-
             question_type = (
                 QuestionType.OBJECTIVE
                 if item.get("options")
@@ -127,9 +150,7 @@ class ExamService:
         session_id: UUID,
     ) -> ExamSession:
 
-        session = await self._repository.get_session(
-            session_id
-        )
+        session = await self._repository.get_session(session_id)
 
         if session is None:
             raise ExamNotFoundError(

@@ -13,15 +13,23 @@ from app.modules.exams.grading import ExamGradingService
 from app.modules.exams.repository import ExamRepository
 from app.modules.exams.service import ExamService
 
+from app.modules.knowledge_engine.repository import KnowledgeRepository
+
 
 # ============================================================
-# Repository
+# Database
 # ============================================================
 
 async def get_exam_repository(
     session: AsyncSession = Depends(get_async_session),
 ) -> ExamRepository:
     return ExamRepository(session)
+
+
+async def get_knowledge_repository(
+    session: AsyncSession = Depends(get_async_session),
+) -> KnowledgeRepository:
+    return KnowledgeRepository(session)
 
 
 # ============================================================
@@ -50,10 +58,14 @@ def get_theory_marker(
 
 def get_exam_service(
     repository: ExamRepository = Depends(get_exam_repository),
+    knowledge_repository: KnowledgeRepository = Depends(
+        get_knowledge_repository
+    ),
     generator: ExamGenerator = Depends(get_exam_generator),
 ) -> ExamService:
     return ExamService(
         repository=repository,
+        knowledge_repository=knowledge_repository,
         generator=generator,
     )
 

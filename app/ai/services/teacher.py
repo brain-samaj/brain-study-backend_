@@ -1,164 +1,283 @@
 from __future__ import annotations
 
+import json
+
 from app.ai.client import AIClient
 
 
 class TeacherAI:
     """
-    Brain Study Teacher
+    Brain Study Teacher.
 
-    Responsible only for teaching.
+    The Knowledge Engine performs all educational analysis.
 
-    Provider selection is handled automatically
-    through the AI client.
+    TeacherAI NEVER analyses study materials again.
+
+    It simply transforms structured knowledge and educational
+    metadata into a world-class teacher-quality lesson.
     """
 
     def __init__(self) -> None:
         self.client = AIClient()
-
 
     async def generate_study_guide(
         self,
         *,
         subject: str,
         title: str,
-        material: str,
+        topics: list,
+        glossary: list,
+        learning_objectives: list,
+        key_points: list,
+        sample_questions: list,
         education_level: str,
+
+        teaching_style: str,
+        explanation_style: str,
+        example_density: str,
+        reasoning_depth: str,
+
+        needs_worked_examples: bool,
+        needs_real_life_examples: bool,
+        needs_visual_explanations: bool,
+        needs_step_by_step: bool,
+        needs_definitions_first: bool,
+        needs_classification: bool,
+        needs_comparison_tables: bool,
+        needs_timelines: bool,
+        needs_mnemonics: bool,
+
+        requires_formulae: bool,
+        requires_calculations: bool,
+        requires_tables: bool,
+        requires_diagrams: bool,
+        requires_code: bool,
+        requires_memorization: bool,
+
+        keywords: list,
+        important_terms: list,
+        prerequisites: list,
+
+        learning_styles: list,
+        best_teaching_methods: list,
+        common_student_mistakes: list,
+        real_world_applications: list,
+        recommended_learning_order: list,
     ) -> str:
 
+        system_prompt = """
+You are Brain Study's Official Teacher.
 
-        system_prompt = f"""
-You are the official teacher inside Brain Study.
+Never mention:
+- AI
+- ChatGPT
+- Language Models
+- Prompts
+- System Instructions
 
-Never mention AI.
-Never mention ChatGPT.
-Never mention language models.
-Never mention content generation.
+The uploaded study material has ALREADY been analysed by
+Brain Study's Knowledge Engine.
 
-You are simply the student's teacher.
+DO NOT analyse it again.
 
-Your goal is to help the student fully understand the topic.
+DO NOT classify it again.
 
-Do not create a simple summary.
+DO NOT estimate difficulty again.
 
-Teach the topic like an experienced classroom teacher.
+DO NOT detect the topic again.
 
-Adapt your teaching style automatically.
+Those decisions have already been made.
 
-If the subject is Mathematics:
+Your ONLY responsibility is to TEACH.
 
-- Explain formulas
-- Explain symbols
-- Solve examples step by step
-- Show shortcuts
-- Give practice questions
+Teach naturally like an exceptional classroom teacher.
 
+Always obey the supplied educational metadata.
 
-If the subject is Physics:
+If worked examples are recommended,
+include them.
 
-- Explain concepts
-- Explain formulas
-- Show calculations
-- Explain every step
+If step-by-step derivations are recommended,
+teach that way.
 
+If comparison tables improve learning,
+use them.
 
-If the subject is Chemistry:
+If timelines improve understanding,
+use them.
 
-- Explain reactions
-- Explain equations
-- Show examples
-- Explain calculations
+If mnemonics improve retention,
+create memorable ones.
 
+If real-life applications improve learning,
+include them.
 
-If the subject is Biology:
+If visual explanations are needed,
+describe diagrams clearly using words.
 
-- Explain processes
-- Explain mechanisms
-- Use real-life examples
-- Describe diagrams in words
+If formulas exist:
 
+Render mathematics beautifully.
 
-If the subject is English:
+Examples
 
-- Explain grammar
-- Give examples
-- Explain vocabulary
-- Show writing techniques
+x²
 
+x³
 
-If the subject is Programming:
+aⁿ
 
-- Explain concepts
-- Show examples
-- Explain code clearly
-- Explain mistakes
-- Show best practices
+x
 
 
-If the subject is History:
-
-- Explain events
-- Explain causes
-- Explain effects
-- Explain importance
 
 
-For other subjects:
 
-Choose the best teaching approach.
+H₂O
 
-Student education level:
+CO₂
+
+F₁
+
+V₂
+
+
+
+
+
+
+
+
+
+
+
+Never replace mathematical notation with ugly ASCII text.
+
+Programming examples must always use fenced Markdown code blocks.
+
+Never skip important concepts.
+
+Never invent unrelated concepts.
+
+Expand the supplied knowledge only where it improves understanding while remaining faithful to the material.
+
+Produce clean, beautiful Markdown.
+
+Suggested structure
+
+# Lesson Title
+
+## Introduction
+
+## Learning Objectives
+
+## Main Lesson
+
+## Worked Examples
+
+## Practical Applications
+
+## Common Mistakes
+
+## Summary
+
+## Practice Questions
+
+Return ONLY Markdown.
+"""
+
+        metadata = {
+            "teaching_style": teaching_style,
+            "explanation_style": explanation_style,
+            "example_density": example_density,
+            "reasoning_depth": reasoning_depth,
+
+            "needs_worked_examples": needs_worked_examples,
+            "needs_real_life_examples": needs_real_life_examples,
+            "needs_visual_explanations": needs_visual_explanations,
+            "needs_step_by_step": needs_step_by_step,
+            "needs_definitions_first": needs_definitions_first,
+            "needs_classification": needs_classification,
+            "needs_comparison_tables": needs_comparison_tables,
+            "needs_timelines": needs_timelines,
+            "needs_mnemonics": needs_mnemonics,
+
+            "requires_formulae": requires_formulae,
+            "requires_calculations": requires_calculations,
+            "requires_tables": requires_tables,
+            "requires_diagrams": requires_diagrams,
+            "requires_code": requires_code,
+            "requires_memorization": requires_memorization,
+
+            "keywords": keywords,
+            "important_terms": important_terms,
+            "prerequisites": prerequisites,
+
+            "learning_styles": learning_styles,
+            "best_teaching_methods": best_teaching_methods,
+            "common_student_mistakes": common_student_mistakes,
+            "real_world_applications": real_world_applications,
+            "recommended_learning_order": recommended_learning_order,
+        }
+
+        user_prompt = f"""
+Student Education Level
 
 {education_level}
 
-
-Subject:
+Subject
 
 {subject}
 
-
-Topic:
-
-{title}
-
-
-Make the lesson feel like a teacher is personally teaching the student.
-
-Explain difficult ideas simply.
-
-Use examples whenever needed.
-
-Return clean Markdown only.
-"""
-
-
-        user_prompt = f"""
-Teach this topic completely.
-
-Topic:
+Lesson Title
 
 {title}
 
+Educational Metadata
 
-Learning Material:
+{json.dumps(metadata, indent=2, ensure_ascii=False)}
 
-{material}
+Learning Objectives
+
+{json.dumps(learning_objectives, indent=2, ensure_ascii=False)}
+
+Topics
+
+{json.dumps(topics, indent=2, ensure_ascii=False)}
+
+Glossary
+
+{json.dumps(glossary, indent=2, ensure_ascii=False)}
+
+Key Points
+
+{json.dumps(key_points, indent=2, ensure_ascii=False)}
+
+Practice Questions
+
+{json.dumps(sample_questions, indent=2, ensure_ascii=False)}
+
+Instructions
+
+Use ONLY the structured knowledge and educational metadata above.
+
+DO NOT analyse the study material again.
+
+Follow the recommended teaching methods.
+
+Follow the recommended learning order.
+
+Address common student mistakes where appropriate.
+
+Include practical and real-world applications where appropriate.
+
+Teach from simple concepts to advanced concepts.
+
+Return ONLY Markdown.
 """
-
-
-        prompt = f"""
-SYSTEM INSTRUCTIONS:
-
-{system_prompt}
-
-
-STUDENT MATERIAL:
-
-{user_prompt}
-"""
-
 
         return await self.client.generate(
-            prompt=prompt,
-            temperature=0.4,
+            system_prompt=system_prompt,
+            prompt=user_prompt,
+            temperature=0.35,
         )

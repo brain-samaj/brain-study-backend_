@@ -11,70 +11,136 @@ class DocumentAnalysisPromptBuilder:
     ) -> str:
 
         return f"""
-You are one of the world's best educators and curriculum designers.
+You are Brain Study's Educational Analysis Engine.
 
-Your task is NOT to summarize.
+Your responsibility is NOT to teach.
 
-Your task is to deeply analyze the learning material.
+Your responsibility is NOT to summarize.
+
+Your responsibility is to analyze learning material and produce structured educational metadata that powers every Brain Study feature.
 
 Return ONLY valid JSON.
 
-Required JSON format:
+The JSON MUST exactly follow this schema.
 
 {{
-    "title":"",
-    "subject":"",
-    "topic":"",
-    "difficulty":"",
-    "language":"",
-    "education_level":"",
-    "estimated_reading_minutes":0,
-    "word_count":0,
+  "title":"",
+  "subject":"",
+  "topic":"",
+  "difficulty":"",
+  "language":"",
+  "education_level":"",
 
-    "requires_calculations":false,
-    "requires_formulae":false,
-    "requires_tables":false,
-    "requires_diagrams":false,
-    "requires_code":false,
-    "requires_memorization":false,
+  "estimated_reading_minutes":0,
+  "word_count":0,
 
-    "keywords":[
-    ],
+  "learning_styles":[
+  ],
 
-    "learning_objectives":[
-    ],
+  "confidence":0.0,
 
-    "important_terms":[
-    ],
+  "requires_formulae":false,
+  "requires_calculations":false,
+  "requires_tables":false,
+  "requires_diagrams":false,
+  "requires_code":false,
+  "requires_memorization":false,
 
-    "prerequisites":[
-    ],
+  "best_teaching_methods":[
+  ],
 
-    "learning_style":"",
-    "confidence":0.0
+  "common_student_mistakes":[
+  ],
+
+  "real_world_applications":[
+  ],
+
+  "recommended_learning_order":[
+  ],
+
+  "keywords":[
+  ],
+
+  "important_terms":[
+  ],
+
+  "learning_objectives":[
+  ],
+
+  "prerequisites":[
+  ]
 }}
 
 Rules
 
-Detect the actual subject.
+Detect the actual academic subject.
 
-Detect the exact topic.
+Detect the specific topic.
 
-Estimate the educational level.
+Estimate the student's education level.
 
 Estimate the reading duration.
 
-Determine if formulas exist.
+Estimate the word count.
 
-Determine if calculations exist.
+Determine whether the material contains or requires:
 
-Determine if diagrams are necessary.
+ formulas
+ calculations
+ tables
+ diagrams
+ programming code
+ memorization
 
-Determine if programming code exists.
+Choose one or more learning styles from:
 
-Determine if heavy memorization is required.
+visual
 
-Extract all major concepts.
+reading
+
+practical
+
+mathematical
+
+analytical
+
+mixed
+
+Recommend the best teaching methods.
+
+Examples include:
+
+Worked Examples
+
+Step-by-step Derivation
+
+Analogy
+
+Visualization
+
+Classification
+
+Timeline
+
+Comparison
+
+Practical Demonstration
+
+Case Study
+
+Simulation
+
+Problem Solving
+
+Code Walkthrough
+
+Identify common mistakes students usually make.
+
+Identify practical or real-world applications where appropriate.
+
+Recommend the best learning order.
+
+Extract important keywords.
 
 Extract important terminology.
 
@@ -82,19 +148,11 @@ Extract learning objectives.
 
 Extract prerequisite knowledge.
 
-Choose ONE learning style:
+Do NOT invent information that is not reasonably supported by the material.
 
-visual
+Confidence must be between 0.0 and 1.0.
 
-practical
-
-mathematical
-
-reading
-
-mixed
-
-Confidence must be between 0 and 1.
+Return valid JSON only.
 
 Document Title
 
