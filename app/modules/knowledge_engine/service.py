@@ -10,7 +10,6 @@ from app.ai.client import AIClient
 from app.modules.knowledge_engine.models import KnowledgeSource
 from app.modules.knowledge_engine.repository import KnowledgeRepository
 from app.modules.knowledge_engine.schemas import (
-    GlossaryItem,
     KnowledgeCreate,
     KnowledgeTopic,
     KnowledgeUpdate,
@@ -357,8 +356,8 @@ The JSON MUST follow this schema exactly.
     }}
   ],
 
-  "glossary": [
-    {
+  "  {{glossary": [
+    {{
       "term": "",
       "definition": ""
     }}
