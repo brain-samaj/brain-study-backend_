@@ -55,7 +55,9 @@ class ExamRepository:
             select(ExamSession)
             .options(
                 selectinload(ExamSession.questions),
-                selectinload(ExamSession.answers),
+                selectinload(ExamSession.answers).selectinload(
+                    ExamAnswer.attachments
+                ),
             )
             .where(
                 ExamSession.id == session_id

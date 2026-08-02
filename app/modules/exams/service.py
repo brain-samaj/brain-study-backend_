@@ -157,7 +157,17 @@ Needs Step-by-Step: {analysis.get("needs_step_by_step", False)}
         await self._repository.update_session(session)
         await self._repository.commit()
 
-        return session
+        # Reload the session with relationships already loaded
+        reloaded_session = await self._repository.get_session(
+            session.id
+        )
+
+        if reloaded_session is None:
+            raise RuntimeError(
+                "Failed to reload newly created exam session."
+            )
+
+        return reloaded_session
 
     async def get_exam(
         self,
