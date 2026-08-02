@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import time
+import traceback
 from pathlib import Path
 from uuid import UUID
 
@@ -13,6 +14,7 @@ from app.modules.knowledge_engine.schemas import (
     KnowledgeCreate,
     KnowledgeTopic,
     KnowledgeUpdate,
+    GlossaryItem,
     LearningObjective,
     SampleQuestion,
 )
@@ -488,71 +490,77 @@ Study Material:
                 * 1000
             )
 
-            knowledge = await self.repository.create(
 
-                KnowledgeCreate(
+            knowledge_data = KnowledgeCreate(
 
-                    material_id=material.id,
+                material_id=material.id,
 
-                    title=response.get(
-                        "title",
-                        material.title,
-                    ),
+                title=response.get(
+                    "title",
+                    material.title,
+                ),
 
-                    summary=response.get(
-                        "summary",
-                        "",
-                    ),
+                summary=response.get(
+                    "summary",
+                    "",
+                ),
 
-                    knowledge=response,
+                knowledge=response,
 
-                    topics=[
-                        KnowledgeTopic(**item)
-                        for item in response.get(
-                            "topics",
-                            [],
-                        )
-                    ],
-
-                    glossary=[
-                        GlossaryItem(**item)
-                        for item in response.get(
-                            "glossary",
-                            [],
-                        )
-                    ],
-
-                    learning_objectives=[
-                        LearningObjective(**item)
-                        for item in response.get(
-                            "learning_objectives",
-                            [],
-                        )
-                    ],
-
-                    key_points=response.get(
-                        "key_points",
+                topics=[
+                    KnowledgeTopic(**item)
+                    for item in response.get(
+                        "topics",
                         [],
-                    ),
+                    )
+                ],
 
-                    sample_questions=[
-                        SampleQuestion(**item)
-                        for item in response.get(
-                            "sample_questions",
-                            [],
-                        )
-                    ],
+                glossary=[
+                    GlossaryItem(**item)
+                    for item in response.get(
+                        "glossary",
+                        [],
+                    )
+                ],
 
-                    total_tokens=0,
+                learning_objectives=[
+                    LearningObjective(**item)
+                    for item in response.get(
+                        "learning_objectives",
+                        [],
+                    )
+                ],
 
-                    ai_provider="Brain AI",
+                key_points=response.get(
+                    "key_points",
+                    [],
+                ),
 
-                    ai_model="Knowledge Engine",
+                sample_questions=[
+                    SampleQuestion(**item)
+                    for item in response.get(
+                        "sample_questions",
+                        [],
+                    )
+                ],
 
-                    processing_time_ms=elapsed,
+                total_tokens=0,
 
-                    is_cached=False,
-                )
+                ai_provider="Brain AI",
+
+                ai_model="Knowledge Engine",
+
+                processing_time_ms=elapsed,
+
+                is_cached=False,
+            )
+
+            print("========== KNOWLEDGE DATA CREATED ==========")
+            print(knowledge_data.model_dump())
+            print("============================================")
+
+            knowledge = await self.repository.create(
+                knowledge_data
             )
 
             await self._mark_ready(
