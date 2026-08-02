@@ -65,22 +65,36 @@ SUMMARY:
 {knowledge.summary}
 
 TOPICS:
-{knowledge.topics}
+{chr(10).join(
+    f"- {topic.get('title', '')}: {topic.get('content', '')[:500]}"
+    for topic in (knowledge.topics or [])
+)}
 
 KEY POINTS:
-{knowledge.key_points}
-
-GLOSSARY:
-{knowledge.glossary}
+{chr(10).join(
+    f"- {point}"
+    for point in (knowledge.key_points or [])
+)}
 
 LEARNING OBJECTIVES:
-{knowledge.learning_objectives}
+{chr(10).join(
+    f"- {obj.get('objective', '')}"
+    for obj in (knowledge.learning_objectives or [])
+)}
 
-SAMPLE QUESTIONS:
-{knowledge.sample_questions}
+IMPORTANT TERMS:
+{", ".join(
+    analysis.get("important_terms", [])
+)}
 
 EDUCATIONAL ANALYSIS:
-{analysis}
+Subject: {analysis.get("subject", "")}
+Teaching Style: {analysis.get("teaching_style", "")}
+Reasoning Depth: {analysis.get("reasoning_depth", "")}
+Requires Formulae: {analysis.get("requires_formulae", False)}
+Requires Calculations: {analysis.get("requires_calculations", False)}
+Needs Worked Examples: {analysis.get("needs_worked_examples", False)}
+Needs Step-by-Step: {analysis.get("needs_step_by_step", False)}
 """.strip()
 
         generated = await self._generator.generate(
