@@ -56,9 +56,14 @@ class ExamGradingService:
             incorrect_answers = 0
             unanswered = 0
 
+            answers_by_question = {
+                answer.question_id: answer
+                for answer in session.answers
+            }
+
             for question in session.questions:
 
-                answer = question.answer
+                answer = answers_by_question.get(question.id)
 
                 if answer is None:
                     unanswered += 1
