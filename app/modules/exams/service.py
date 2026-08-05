@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from uuid import UUID
 
 from app.ai.services.exam_generator import ExamGenerator
@@ -104,6 +104,11 @@ Needs Step-by-Step: {analysis.get("needs_step_by_step", False)}
             difficulty=request.difficulty,
         )
 
+        started_at = datetime.now(UTC)
+        expires_at = started_at + timedelta(
+            minutes=request.duration_minutes,
+        )
+
         session = ExamSession(
             owner_id=owner_id,
             material_id=material_id,
@@ -113,7 +118,8 @@ Needs Step-by-Step: {analysis.get("needs_step_by_step", False)}
             total_marks=0,
             duration_minutes=request.duration_minutes,
             status=ExamStatus.CREATED,
-            started_at=datetime.now(UTC),
+            started_at=started_at,
+            expires_at=expires_at,
         )
 
         await self._repository.create_session(session)
@@ -121,6 +127,7 @@ Needs Step-by-Step: {analysis.get("needs_step_by_step", False)}
         total_marks = 0
 
         for item in generated["questions"]:
+
             question_type = (
                 QuestionType.OBJECTIVE
                 if item.get("options")
@@ -150,10 +157,8 @@ Needs Step-by-Step: {analysis.get("needs_step_by_step", False)}
                 instructions=item.get("instructions"),
             )
 
-            await self._repository.create_question(question)
-
+        await self._repository.create_question(question)
         session.total_marks = total_marks
-
         await self._repository.update_session(session)
         await self._repository.commit()
 
