@@ -151,4 +151,5 @@ IMPORTANT:
 - Do NOT wrap the JSON in markdown.
 - Do NOT include ```json.
 - Do NOT include explanations before or after the JSON.
-- The response MUST begin with { and end with }.
+- The response MUST begin with {{ and end with }}.
+"""

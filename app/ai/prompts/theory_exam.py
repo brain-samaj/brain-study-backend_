@@ -10,10 +10,9 @@ No code fences.
 
 
 THEORY_EXAM_PROMPT = """
-You are an expert academic examiner responsible for creating
-professional theory examination questions.
+You are an expert university examination paper setter.
 
-Generate THEORY QUESTIONS ONLY from the supplied study material.
+Generate professional THEORY examination questions ONLY from the supplied study material.
 
 ==============================
 Study Material
@@ -28,150 +27,154 @@ Exam Configuration
 Difficulty:
 {difficulty}
 
-Number of Questions:
-{question_count}
+Student requested to answer:
+{question_count} questions.
 
-You MUST generate EXACTLY {question_count} theory questions.
+IMPORTANT:
 
-Do NOT generate fewer questions.
-Do NOT generate more questions.
+Generate MORE questions than requested.
 
-Question numbers MUST start at 1 and increase sequentially.
+If question_count is 5 or less,
+generate question_count + 1 questions.
 
-For example, if {question_count} = 5, the question numbers must be:
+If question_count is greater than 5,
+generate question_count + 2 questions.
 
-1
-2
-3
-4
-5
+The student will answer ONLY {question_count} questions.
+
+Question numbers MUST start from 1 and increase sequentially.
 
 ==============================
 Question Requirements
 ==============================
 
-Each theory question must evaluate:
+Questions must be based ONLY on the supplied study material.
+
+Do NOT invent information.
+
+Every main question must test:
 
 - Understanding
-- Explanation ability
-- Critical thinking
-- Application of concepts
+- Application
+- Critical Thinking
+- Explanation
+- Analysis
 
-Questions must be directly based on the supplied material.
+Each main question MUST contain between TWO and FIVE subquestions.
 
-Do NOT introduce information outside the material.
+Subquestions should be labelled:
 
-Each question must include:
+(a)
+(b)
+(c)
+(d)
+(e)
 
-1. question_number
-2. question
-3. subquestions
-4. marking_scheme
-5. model_answer
-6. instructions
-7. topic
-8. difficulty
-9. marks
+Each main question must contain:
 
-==============================
-Marking Scheme Rules
-==============================
-
-The marking scheme must clearly show:
-
-- Expected points
-- Marks allocated
-- What earns full marks
-
-Example:
-
-[
-  {{
-    "point": "Definition of concept",
-    "marks": 2
-  }},
-  {{
-    "point": "Explanation with example",
-    "marks": 3
-  }}
-]
-
+- question_number
+- question
+- subquestions
+- marking_scheme
+- model_answer
+- instructions
+- topic
+- difficulty
+- marks
 
 ==============================
-Output Format
+Marking Scheme
 ==============================
 
-Return ONLY this JSON structure:
+Every marking_scheme item MUST contain:
 
-{{
+- point
+- marks
+
+Marks must always be positive integers.
+
+==============================
+Return ONLY JSON
+==============================
+
+{
+  "exam_instruction": "Answer any {question_count} questions.",
+
   "questions": [
-    {{
+
+    {
       "question_number": 1,
-      "question": "...",
+
+      "question": "Explain Database Normalization.",
+
       "subquestions": [
-        "..."
+
+        {
+          "label": "a",
+          "question": "Define database normalization."
+        },
+
+        {
+          "label": "b",
+          "question": "Explain First Normal Form."
+        },
+
+        {
+          "label": "c",
+          "question": "State two advantages of normalization."
+        }
+
       ],
+
       "marking_scheme": [
-        {{
-          "point": "...",
-          "marks": 2
-        }}
+
+        {
+          "point": "Definition",
+          "marks": 5
+        },
+
+        {
+          "point": "Explanation",
+          "marks": 10
+        },
+
+        {
+          "point": "Advantages",
+          "marks": 5
+        }
+
       ],
+
       "model_answer": "...",
-      "instructions": "...",
+
+      "instructions": "Answer every subquestion.",
+
       "topic": "...",
+
       "difficulty": "...",
-      "marks": 10
-    }},
-    {{
-      "question_number": 2,
-      "question": "...",
-      "subquestions": [
-        "..."
-      ],
-      "marking_scheme": [
-        {{
-          "point": "...",
-          "marks": 2
-        }}
-      ],
-      "model_answer": "...",
-      "instructions": "...",
-      "topic": "...",
-      "difficulty": "...",
-      "marks": 10
-    }},
-    {{
-      "question_number": 3,
-      "question": "...",
-      "subquestions": [
-        "..."
-      ],
-      "marking_scheme": [
-        {{
-          "point": "...",
-          "marks": 2
-        }}
-      ],
-      "model_answer": "...",
-      "instructions": "...",
-      "topic": "...",
-      "difficulty": "...",
-      "marks": 10
-    }}
+
+      "marks": 20
+
+    }
+
   ]
-}}
+
+}
 
 IMPORTANT:
 
-- Generate EXACTLY {question_count} questions.
-- The "questions" array MUST contain EXACTLY {question_count} objects.
-- Return ONLY the JSON object.
-- Do NOT wrap the JSON inside markdown.
+- Return ONLY JSON.
+- Do NOT wrap JSON inside markdown.
 - Do NOT include ```json.
 - Do NOT include explanations before or after the JSON.
-- The response MUST begin with {{ and end with }}.
-- Every "marking_scheme" item MUST contain BOTH:
-  - "point"
-  - "marks"
-- "marks" must always be a positive integer.
+- Generate MORE questions than requested.
+- Include the field "exam_instruction".
+- Each question MUST contain between 2 and 5 subquestions.
+- Every subquestion MUST contain:
+  - label
+  - question
+- Every marking_scheme item MUST contain:
+  - point
+  - marks
+- Marks must always be positive integers.
+"""
