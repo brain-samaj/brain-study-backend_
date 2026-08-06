@@ -9,6 +9,7 @@ from fastapi import HTTPException
 from fastapi import Query
 from fastapi import status
 
+from app.modules.exams.repository import ExamRepository
 from app.modules.auth.dependencies import get_current_user
 from app.modules.exams.autosave import ExamAutosaveService
 from app.modules.exams.dependencies import (
@@ -19,6 +20,7 @@ from app.modules.exams.dependencies import (
 )
 from app.modules.exams.grading import ExamGradingService
 from app.modules.exams.history import ExamHistoryService
+from app.modules.exams.review import ExamReviewService
 from app.modules.exams.schemas import (
     CreateExamRequest,
     ExamSessionResponse,
@@ -216,6 +218,28 @@ async def get_exam_result(
         )
 
     return result
+
+# ============================================================
+# REVIEW
+# ============================================================
+
+@router.get("/{session_id}/review")
+async def get_exam_review(
+    session_id: UUID,
+    repository: ExamRepository = Depends(get_exam_repository),
+    current_user=Depends(get_current_user),
+):
+    service = ExamReviewService(repository)
+
+    review = await service.get_review(session_id)
+
+    if review is None:
+        raise HTTPException(
+            status_code=404,
+            detail="Review not found.",
+        )
+
+    return review
 
 # ============================================================
 # HISTORY

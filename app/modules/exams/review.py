@@ -1,203 +1,95 @@
 from __future__ import annotations
 
-import json
-from dataclasses import dataclass
-from typing import Any
+from uuid import UUID
 
-from app.ai.client import AIClient
-from app.modules.exams.exceptions import ReviewGenerationError
-from app.modules.exams.models import ExamSession
-from app.modules.exams.repository import ExamRepository
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
 
-
-@dataclass(slots=True)
-class ExamReviewResult:
-    """
-    Final AI-generated exam review.
-    """
-
-    overall_feedback: str
-
-    strengths: list[str]
-
-    weaknesses: list[str]
-
-    recommendations: list[str]
-
-    study_plan: list[str]
-
-    topic_analysis: list[dict[str, Any]]
-
-    confidence_score: float
+from app.modules.exams.models import ExamAnswer
+from app.modules.exams.models import ExamQuestion
 
 
 class ExamReviewService:
     """
-    Enterprise Exam Review Generator.
+    Review service.
 
-    Responsibilities
-    ----------------
-    - Analyze completed exams.
-    - Generate personalized feedback.
-    - Identify weak areas.
-    - Recommend improvements.
+    Returns every question together with:
 
-    AI is backend-only.
-
-    Frontend receives only JSON.
+    - student's answer
+    - correct answer
+    - marks
+    - obtained marks
+    - explanation
     """
 
     def __init__(
         self,
+        session: AsyncSession,
+    ) -> None:
+        self._session = session
+
+    async def get_review(
+        self,
         *,
-        repository: ExamRepository,
-        ai_client: AIClient,
-    ) -> None:
+        session_id: UUID,
+    ) -> list[dict]:
 
-        self._repository = repository
-        self._ai_client = ai_client
-
-
-    async def generate_review(
-        self,
-        session: ExamSession,
-    ) -> ExamReviewResult:
-
-        prompt = self._build_prompt(
-            session,
+        query = (
+            select(
+                ExamQuestion,
+                ExamAnswer,
+            )
+            .outerjoin(
+                ExamAnswer,
+                (
+                    (ExamAnswer.question_id == ExamQuestion.id)
+                    &
+                    (ExamAnswer.session_id == session_id)
+                ),
+            )
+            .where(
+                ExamQuestion.session_id == session_id
+            )
+            .order_by(
+                ExamQuestion.question_number
+            )
         )
 
-        response = await self._ai_client.generate_json(
-            system_prompt=(
-                "You are an expert learning coach "
-                "and academic analyst."
-            ),
-            prompt=prompt,
-            temperature=0.3,
-        )
+        result = await self._session.execute(query)
 
-        self._validate(
-            response,
-        )
+        review: list[dict] = []
 
-        review = ExamReviewResult(
-            overall_feedback=response[
-                "overall_feedback"
-            ],
-            strengths=response[
-                "strengths"
-            ],
-            weaknesses=response[
-                "weaknesses"
-            ],
-            recommendations=response[
-                "recommendations"
-            ],
-            study_plan=response[
-                "study_plan"
-            ],
-            topic_analysis=response[
-                "topic_analysis"
-            ],
-            confidence_score=float(
-                response[
-                    "confidence_score"
-                ]
-            ),
-        )
+        for question, answer in result.all():
 
-        return review
-
-
-    def _build_prompt(
-        self,
-        session: ExamSession,
-    ) -> str:
-
-        return f"""
-Analyze this completed exam.
-
-Exam Type:
-{session.exam_type.value}
-
-Difficulty:
-{session.difficulty.value}
-
-Score:
-{session.obtained_marks}/{session.total_marks}
-
-Percentage:
-{session.percentage}
-
-Questions:
-{[
-    {
-        "question": question.question,
-        "topic": question.topic,
-        "marks": question.marks
-    }
-    for question in session.questions
-]}
-
-Create a personalized learning review.
-
-Return JSON only:
-
-{{
- "overall_feedback":"",
- "strengths":[],
- "weaknesses":[],
- "recommendations":[],
- "study_plan":[],
- "topic_analysis":[],
- "confidence_score":0
-}}
-"""
-
-
-    def _validate(
-        self,
-        payload: dict[str, Any],
-    ) -> None:
-
-        required = (
-            "overall_feedback",
-            "strengths",
-            "weaknesses",
-            "recommendations",
-            "study_plan",
-            "topic_analysis",
-            "confidence_score",
-        )
-
-        for field in required:
-
-            if field not in payload:
-                raise ReviewGenerationError(
-                    f"Missing review field: {field}"
+            if question.question_type.value == "objective":
+                student_answer = (
+                    answer.selected_option
+                    if answer
+                    else None
+                )
+            else:
+                student_answer = (
+                    answer.text_answer
+                    if answer
+                    else None
                 )
 
-        if not isinstance(
-            payload["strengths"],
-            list,
-        ):
-            raise ReviewGenerationError(
-                "Strengths must be a list."
+            review.append(
+                {
+                    "question_id": str(question.id),
+                    "question_number": question.question_number,
+                    "question": question.question,
+                    "question_type": question.question_type.value,
+                    "student_answer": student_answer,
+                    "correct_answer": question.correct_answer,
+                    "marks": question.marks,
+                    "obtained_marks": (
+                        answer.awarded_marks
+                        if answer
+                        else 0
+                    ),
+                    "explanation": question.explanation,
+                }
             )
 
-        if not isinstance(
-            payload["weaknesses"],
-            list,
-        ):
-            raise ReviewGenerationError(
-                "Weaknesses must be a list."
-            )
-
-        score = float(
-            payload["confidence_score"]
-        )
-
-        if score < 0 or score > 100:
-            raise ReviewGenerationError(
-                "Invalid confidence score."
-            )
+        return review

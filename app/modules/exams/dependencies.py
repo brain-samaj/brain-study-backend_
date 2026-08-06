@@ -11,13 +11,16 @@ from app.database.async_session import get_async_session
 from app.modules.exams.autosave import ExamAutosaveService
 from app.modules.exams.grading import ExamGradingService
 from app.modules.exams.repository import ExamRepository
+from app.modules.exams.review import ExamReviewService
 from app.modules.exams.service import ExamService
 
-from app.modules.knowledge_engine.repository import KnowledgeRepository
+from app.modules.knowledge_engine.repository import (
+    KnowledgeRepository,
+)
 
 
 # ============================================================
-# Database
+# DATABASE
 # ============================================================
 
 async def get_exam_repository(
@@ -53,7 +56,7 @@ def get_theory_marker(
 
 
 # ============================================================
-# Services
+# SERVICES
 # ============================================================
 
 def get_exam_service(
@@ -86,3 +89,10 @@ def get_grading_service(
         repository=repository,
         theory_marker=theory_marker,
     )
+
+
+def get_review_service(
+    session: AsyncSession = Depends(get_async_session),
+) -> ExamReviewService:
+    return ExamReviewService(session)
+
