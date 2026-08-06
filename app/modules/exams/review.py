@@ -11,8 +11,6 @@ from app.modules.exams.models import ExamQuestion
 
 class ExamReviewService:
     """
-    Review service.
-
     Returns every question together with:
 
     - student's answer
@@ -30,7 +28,6 @@ class ExamReviewService:
 
     async def get_review(
         self,
-        *,
         session_id: UUID,
     ) -> list[dict]:
 
