@@ -188,16 +188,14 @@ async def submit_exam(
 @router.get("/{session_id}/timer")
 async def exam_timer(
     session_id: UUID,
+    repository: ExamRepository = Depends(get_exam_repository),
     current_user=Depends(get_current_user),
 ):
     from app.modules.exams.timer import ExamTimerService
 
-    repository = await get_exam_repository()
-
     service = ExamTimerService(repository=repository)
 
     return await service.get_remaining_time(session_id)
-
 
 # ============================================================
 # RESULT
@@ -206,10 +204,9 @@ async def exam_timer(
 @router.get("/{session_id}/result")
 async def get_exam_result(
     session_id: UUID,
+    repository: ExamRepository = Depends(get_exam_repository),
     current_user=Depends(get_current_user),
 ):
-    repository = await get_exam_repository()
-
     result = await repository.get_result(session_id)
 
     if result is None:
@@ -219,7 +216,6 @@ async def get_exam_result(
         )
 
     return result
-
 
 # ============================================================
 # HISTORY
