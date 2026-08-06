@@ -92,9 +92,9 @@ Return ONLY a valid JSON object.
 Output JSON ONLY
 ==============================
 
-{
+{{
   "questions": [
-    {
+    {{
       "question_number": 1,
       "question": "...",
       "options": [
@@ -108,8 +108,8 @@ Output JSON ONLY
       "topic": "...",
       "difficulty": "...",
       "marks": 2
-    },
-    {
+    }},
+    {{
       "question_number": 2,
       "question": "...",
       "options": [
@@ -123,8 +123,8 @@ Output JSON ONLY
       "topic": "...",
       "difficulty": "...",
       "marks": 2
-    },
-    {
+    }},
+    {{
       "question_number": 3,
       "question": "...",
       "options": [
@@ -138,9 +138,9 @@ Output JSON ONLY
       "topic": "...",
       "difficulty": "...",
       "marks": 2
-    }
+    }}
   ]
-}
+}}
 
 IMPORTANT:
 

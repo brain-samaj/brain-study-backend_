@@ -97,51 +97,51 @@ Marks must always be positive integers.
 Return ONLY JSON
 ==============================
 
-{
+{{
   "exam_instruction": "Answer any {question_count} questions.",
 
   "questions": [
 
-    {
+    {{
       "question_number": 1,
 
       "question": "Explain Database Normalization.",
 
       "subquestions": [
 
-        {
+        {{
           "label": "a",
           "question": "Define database normalization."
-        },
+        }},
 
-        {
+        {{
           "label": "b",
           "question": "Explain First Normal Form."
-        },
+        }},
 
-        {
+        {{
           "label": "c",
           "question": "State two advantages of normalization."
-        }
+        }}
 
       ],
 
       "marking_scheme": [
 
-        {
+        {{
           "point": "Definition",
           "marks": 5
-        },
+        }},
 
-        {
+        {{
           "point": "Explanation",
           "marks": 10
-        },
+        }},
 
-        {
+        {{
           "point": "Advantages",
           "marks": 5
-        }
+        }}
 
       ],
 
@@ -155,11 +155,11 @@ Return ONLY JSON
 
       "marks": 20
 
-    }
+    }}
 
   ]
 
-}
+}}
 
 IMPORTANT:
 
