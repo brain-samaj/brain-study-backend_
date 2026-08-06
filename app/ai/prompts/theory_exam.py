@@ -31,6 +31,21 @@ Difficulty:
 Number of Questions:
 {question_count}
 
+You MUST generate EXACTLY {question_count} theory questions.
+
+Do NOT generate fewer questions.
+Do NOT generate more questions.
+
+Question numbers MUST start at 1 and increase sequentially.
+
+For example, if {question_count} = 5, the question numbers must be:
+
+1
+2
+3
+4
+5
+
 ==============================
 Question Requirements
 ==============================
@@ -81,6 +96,7 @@ Example:
   }}
 ]
 
+
 ==============================
 Output Format
 ==============================
@@ -91,28 +107,56 @@ Return ONLY this JSON structure:
   "questions": [
     {{
       "question_number": 1,
-
       "question": "...",
-
       "subquestions": [
         "..."
       ],
-
       "marking_scheme": [
         {{
           "point": "...",
           "marks": 2
         }}
       ],
-
       "model_answer": "...",
-
       "instructions": "...",
-
       "topic": "...",
-
       "difficulty": "...",
-
+      "marks": 10
+    }},
+    {{
+      "question_number": 2,
+      "question": "...",
+      "subquestions": [
+        "..."
+      ],
+      "marking_scheme": [
+        {{
+          "point": "...",
+          "marks": 2
+        }}
+      ],
+      "model_answer": "...",
+      "instructions": "...",
+      "topic": "...",
+      "difficulty": "...",
+      "marks": 10
+    }},
+    {{
+      "question_number": 3,
+      "question": "...",
+      "subquestions": [
+        "..."
+      ],
+      "marking_scheme": [
+        {{
+          "point": "...",
+          "marks": 2
+        }}
+      ],
+      "model_answer": "...",
+      "instructions": "...",
+      "topic": "...",
+      "difficulty": "...",
       "marks": 10
     }}
   ]
@@ -120,6 +164,8 @@ Return ONLY this JSON structure:
 
 IMPORTANT:
 
+- Generate EXACTLY {question_count} questions.
+- The "questions" array MUST contain EXACTLY {question_count} objects.
 - Return ONLY the JSON object.
 - Do NOT wrap the JSON inside markdown.
 - Do NOT include ```json.
@@ -129,4 +175,3 @@ IMPORTANT:
   - "point"
   - "marks"
 - "marks" must always be a positive integer.
-"""
