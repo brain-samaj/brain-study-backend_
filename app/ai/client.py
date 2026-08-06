@@ -39,7 +39,7 @@ class AIClient:
         prompt: str,
         system_prompt: str | None = None,
         temperature: float = 0.2,
-        max_tokens: int = 4096,
+        max_tokens: int = 12000,
         response_format: dict[str, Any] | None = None,
     ) -> str:
 
@@ -129,7 +129,7 @@ class AIClient:
         prompt: str,
         system_prompt: str | None = None,
         temperature: float = 0.2,
-        max_tokens: int = 4096,
+        max_tokens: int = 12000,
     ) -> dict[str, Any]:
 
         raw = await self.generate(
@@ -156,40 +156,66 @@ class AIClient:
         logger.info(cleaned)
         logger.info("=" * 80)
 
+        # ---------- First Attempt ----------
         try:
-            payload = json.loads(cleaned)
+            return json.loads(cleaned)
 
-            logger.info("=" * 80)
-            logger.info("PARSED JSON PAYLOAD")
-            logger.info("=" * 80)
-            logger.info(
-                json.dumps(
-                    payload,
-                    indent=2,
-                    ensure_ascii=False,
-                )
+        except Exception:
+            logger.warning(
+                "First JSON parse failed. Attempting repair..."
             )
-            logger.info("=" * 80)
 
-            return payload
+        # ---------- Repair Common Issues ----------
+
+        repaired = cleaned
+
+        # Remove trailing commas
+        repaired = re.sub(
+            r",(\s*[}\]])",
+            r"\1",
+            repaired,
+        )
+
+        # Remove control characters
+        repaired = re.sub(
+            r"[\x00-\x1f]",
+            "",
+            repaired,
+        )
+
+        # Balance braces
+        open_braces = repaired.count("{")
+        close_braces = repaired.count("}")
+
+        if open_braces > close_braces:
+            repaired += "}" * (open_braces - close_braces)
+
+        # Balance brackets
+        open_brackets = repaired.count("[")
+        close_brackets = repaired.count("]")
+
+        if open_brackets > close_brackets:
+            repaired += "]" * (open_brackets - close_brackets)
+
+        logger.info("=" * 80)
+        logger.info("REPAIRED JSON")
+        logger.info("=" * 80)
+        logger.info(repaired)
+        logger.info("=" * 80)
+
+        # ---------- Second Attempt ----------
+
+        try:
+            return json.loads(repaired)
 
         except Exception as exc:
+
             logger.exception(
-                "Invalid JSON returned by AI."
-            )
-
-            logger.error(
-                "RAW RESPONSE:\n%s",
-                raw,
-            )
-
-            logger.error(
-                "CLEANED RESPONSE:\n%s",
-                cleaned,
+                "Unable to repair AI JSON."
             )
 
             raise AIProviderError(
-                f"AI returned invalid JSON.\n\n{raw}"
+                "AI returned malformed JSON."
             ) from exc
 
     def _extract_json(

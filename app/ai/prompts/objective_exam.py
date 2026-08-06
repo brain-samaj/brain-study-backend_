@@ -1,101 +1,57 @@
 """
-Production Objective Exam Prompt.
+Brain Study Objective Exam Prompt.
 
-The AI MUST return ONLY valid JSON.
-
-No markdown.
-No explanations.
-No code fences.
-No additional text.
+The AI should ONLY generate question content.
+The backend is responsible for numbering, marks,
+difficulty, explanations and other metadata.
 """
 
 OBJECTIVE_EXAM_PROMPT = """
-You are an elite university examination paper setter.
+You are an expert university examination setter.
 
-Generate high-quality MULTIPLE CHOICE QUESTIONS only.
+Generate high-quality multiple-choice questions using ONLY the supplied study material.
 
-==============================
-Study Material
-==============================
+========================
+STUDY MATERIAL
+========================
 
 {study_content}
 
-==============================
-Requirements
-==============================
+========================
+SETTINGS
+========================
 
 Difficulty:
 {difficulty}
 
-Total Questions:
+Number of questions:
 {question_count}
 
-You MUST generate EXACTLY {question_count} questions.
+Generate EXACTLY {question_count} questions.
 
-The "questions" array MUST contain EXACTLY {question_count} objects.
+========================
+RULES
+========================
 
-Do not generate fewer questions.
+- Use ONLY the supplied material.
+- Do NOT invent facts.
+- Every question must have exactly FOUR options.
+- Exactly ONE option must be correct.
+- Shuffle the correct answer naturally.
+- Do NOT include numbering.
+- Do NOT include explanations.
+- Do NOT include marks.
+- Do NOT include topic.
+- Do NOT include difficulty.
+- Do NOT include any extra fields.
 
-Do not generate more questions.
+Return ONLY valid JSON.
 
-Question numbers MUST start at 1 and increase sequentially.
-
-Example for question_count = 5:
-
-question_number: 1
-question_number: 2
-question_number: 3
-question_number: 4
-question_number: 5
-
-Generate questions strictly from the supplied study material.
-
-Do NOT invent facts.
-
-Do NOT ask questions unrelated to the material.
-
-Questions should test:
-
-- Understanding
-- Application
-- Analysis
-- Recall where appropriate
-
-Every question must contain:
-
-- question_number
-- question
-- options
-- correct_answer
-- explanation
-- topic
-- difficulty
-- marks
-
-Options MUST contain exactly four choices.
-
-Correct answer MUST be one of:
-
-A
-B
-C
-D
-
-Marks must be positive integers.
-
-Difficulty should match the requested level.
-
-Return ONLY a valid JSON object.
-
-
-==============================
-Output JSON ONLY
-==============================
+The JSON MUST follow this schema exactly:
 
 {{
   "questions": [
     {{
-      "question_number": 1,
       "question": "...",
       "options": [
         "...",
@@ -103,53 +59,16 @@ Output JSON ONLY
         "...",
         "..."
       ],
-      "correct_answer": "A",
-      "explanation": "...",
-      "topic": "...",
-      "difficulty": "...",
-      "marks": 2
-    }},
-    {{
-      "question_number": 2,
-      "question": "...",
-      "options": [
-        "...",
-        "...",
-        "...",
-        "..."
-      ],
-      "correct_answer": "B",
-      "explanation": "...",
-      "topic": "...",
-      "difficulty": "...",
-      "marks": 2
-    }},
-    {{
-      "question_number": 3,
-      "question": "...",
-      "options": [
-        "...",
-        "...",
-        "...",
-        "..."
-      ],
-      "correct_answer": "C",
-      "explanation": "...",
-      "topic": "...",
-      "difficulty": "...",
-      "marks": 2
+      "correct_answer": "A"
     }}
   ]
 }}
 
-IMPORTANT:
+IMPORTANT
 
-- Generate EXACTLY {question_count} questions.
-- The "questions" array MUST contain EXACTLY {question_count} objects.
-- Question numbers MUST start from 1 and increase sequentially.
-- Return ONLY the JSON object.
-- Do NOT wrap the JSON in markdown.
-- Do NOT include ```json.
-- Do NOT include explanations before or after the JSON.
-- The response MUST begin with {{ and end with }}.
+- Return ONLY JSON.
+- No markdown.
+- No code fences.
+- No text before JSON.
+- No text after JSON.
 """
