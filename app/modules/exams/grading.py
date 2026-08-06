@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import UTC, datetime
+from uuid import UUID
 
 from app.ai.services.theory_marker import TheoryMarker
 from app.modules.exams.exceptions import (
@@ -20,9 +21,8 @@ class ExamGradingService:
     Enterprise Exam Grading Engine.
 
     - Objective questions are marked instantly.
-    - Theory questions are marked by the AI TheoryMarker.
-    - Saves ExamResult.
-    - Updates ExamSession.
+    - Theory questions are marked by AI.
+    - Stores final results.
     """
 
     def __init__(
@@ -37,7 +37,7 @@ class ExamGradingService:
     async def grade_session(
         self,
         *,
-        session_id,
+        session_id: UUID,
     ) -> ExamResult:
 
         session = await self._repository.get_session(session_id)
@@ -56,14 +56,24 @@ class ExamGradingService:
             incorrect_answers = 0
             unanswered = 0
 
+            answers = await self._repository.get_answers_for_session(
+                session.id
+            )
+
             answers_by_question = {
                 answer.question_id: answer
-                for answer in session.answers
+                for answer in answers
             }
 
             for question in session.questions:
 
                 answer = answers_by_question.get(question.id)
+
+                if answer is None:
+                    answer = await self._repository.get_answer(
+                        session_id=session.id,
+                        question_id=question.id,
+                    )
 
                 if answer is None:
                     unanswered += 1
@@ -150,9 +160,9 @@ class ExamGradingService:
             )
 
         return (
-            answer.selected_option.strip().lower()
+            answer.selected_option.strip().upper()
             ==
-            question.correct_answer.strip().lower()
+            question.correct_answer.strip().upper()
         )
 
     async def _grade_theory(

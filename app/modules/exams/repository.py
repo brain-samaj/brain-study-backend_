@@ -141,6 +141,26 @@ class ExamRepository:
 
         return result.scalar_one_or_none()
 
+    async def get_answers_for_session(
+        self,
+        session_id: UUID,
+    ) -> list[ExamAnswer]:
+        """
+        Load all answers belonging to a session.
+        """
+
+        result = await self.session.execute(
+            select(ExamAnswer)
+            .options(
+                selectinload(ExamAnswer.attachments)
+            )
+            .where(
+                ExamAnswer.session_id == session_id
+            )
+        )
+
+        return list(result.scalars().all())
+
     async def create_answer(
         self,
         *,
