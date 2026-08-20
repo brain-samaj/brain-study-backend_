@@ -13,10 +13,13 @@ class StudyGuidePromptBuilder:
 
         sections = [
             "Introduction",
+            "Learning Objectives",
             "Core Concepts",
             "Detailed Explanation",
+            "Worked Examples",
+            "Practice Questions",
             "Common Mistakes",
-            "Practice Tips",
+            "Revision Summary",
             "Exam Tips",
             "Conclusion",
         ]
@@ -25,7 +28,6 @@ class StudyGuidePromptBuilder:
             sections.extend([
                 "Important Formulae",
                 "Formula Explanation",
-                "Worked Examples",
                 "Step-by-Step Calculations",
                 "Calculation Shortcuts",
             ])
@@ -51,56 +53,187 @@ class StudyGuidePromptBuilder:
                 "Mnemonics",
             ])
 
-        prompt = f"""
-You are one of the world's best educators.
+        return f"""
+You are an award-winning professor, textbook author and examination expert.
 
-Create a COMPLETE study guide.
+Your task is to produce a PROFESSIONAL STUDY GUIDE.
 
-Subject:
+SUBJECT
 {analysis.subject}
 
-Topic:
+TOPIC
 {analysis.topic}
 
-Difficulty:
+DIFFICULTY
 {analysis.difficulty}
 
-Learning Style:
+LEARNING STYLE
 {analysis.learning_style}
 
-Sections Required:
+=========================
+OUTPUT RULES
+=========================
 
-{chr(10).join(f"- {s}" for s in sections)}
+Return ONLY Markdown.
 
-Rules
+Use proper Markdown headings.
 
-Teach from the uploaded material.
+# Main Topic
 
-Do not summarize.
+## Sub Topic
 
-Explain every important idea.
+### Sub Section
 
-Give practical examples.
+Separate every section with blank lines.
 
-Never skip difficult concepts.
+Use bullet lists whenever appropriate.
 
-Expand difficult concepts.
+Use numbered lists for procedures.
+
+Use markdown tables for comparisons.
+
+Never write one huge paragraph.
+
+=========================
+MATHEMATICS
+=========================
+
+Whenever mathematics appears:
+
+Write ALL mathematics using LaTeX.
+
+Inline examples:
+
+$x^2$
+
+$a+b$
+
+Display equations:
+
+$$
+x^2+5x+6=0
+$$
+
+Fractions:
+
+$$
+\\frac{{a}}{{b}}
+$$
+
+Square roots:
+
+$$
+\\sqrt{{x}}
+$$
+
+Exponents:
+
+$$
+x^2
+$$
+
+Subscripts:
+
+$$
+H_2O
+$$
+
+Matrices:
+
+$$
+\\begin{{bmatrix}}
+1&2\\\\
+3&4
+\\end{{bmatrix}}
+$$
+
+Never use plain text like
+
+x^2
+
+1/2
+
+sqrt(x)
+
+Always use LaTeX.
+
+=========================
+TEACHING STYLE
+=========================
+
+Teach like a university lecturer.
+
+Explain EVERY concept.
+
+Define every important term.
+
+Explain why.
+
+Explain where it is used.
+
+Give intuition.
+
+Provide real-life applications.
+
+After every major explanation provide at least one worked example.
+
+Worked examples must be step-by-step.
+
+Highlight important notes using Markdown blockquotes.
+
+Example:
+
+> Important Note
+
+Highlight warnings.
+
+Example:
+
+> Exam Tip
+
+Include shortcuts.
+
+Include memory tricks.
+
+Include common mistakes.
+
+Include revision checkpoints.
+
+Include practice questions.
+
+=========================
+VERY IMPORTANT
+=========================
+
+Do NOT summarize.
+
+Do NOT skip difficult concepts.
+
+Teach directly from the uploaded material.
+
+Expand every concept clearly.
 
 If formulas exist, explain every symbol.
 
-If programming, explain every code line.
+If mathematics exists, solve examples step-by-step.
 
-If history, include timelines.
+If chemistry exists, balance and explain reactions.
 
-If biology, explain processes.
+If programming exists, explain every line of code.
 
-If chemistry, explain reactions.
+If history exists, include timelines.
 
-If mathematics, solve examples step-by-step.
+If biology exists, explain every process.
 
-Material
+=========================
+REQUIRED SECTIONS
+=========================
+
+{chr(10).join(f"- {s}" for s in sections)}
+
+=========================
+SOURCE MATERIAL
+=========================
 
 {content}
 """
-
-        return prompt

@@ -1,33 +1,74 @@
 from __future__ import annotations
 
-from app.ai.services.document_extractor import DocumentExtractorService
+from pathlib import Path
 
 from app.ai.exam_engine.objective_generator import ObjectiveExamGenerator
 from app.ai.exam_engine.service import TheoryExamGenerator
+from app.ai.services.document_processor import DocumentProcessor
 
 
 class ExamService:
+    """
+    Application service for examination generation.
 
-    def __init__(self):
+    Pipeline:
 
-        self.documents = DocumentExtractorService()
+        File
+          ↓
+        DocumentProcessor
+          ↓
+        Extraction
+          ↓
+        Cleaning
+          ↓
+        Chunking
+          ↓
+        DocumentAnalysis
+          ↓
+        Exam Generator
+          ↓
+        Exam Paper
 
+    The document is analyzed once by the Knowledge Engine.
+    The resulting DocumentAnalysis is passed to the exam generator.
+    """
+
+    def __init__(self) -> None:
+        self.documents = DocumentProcessor()
+        self.objective = ObjectiveExamGenerator()
         self.theory = TheoryExamGenerator()
 
-        self.objective = ObjectiveExamGenerator()
-
-    def create_objective_exam(
+    async def create_objective_exam(
         self,
-        source: str,
+        source: str | Path,
         duration: int,
         questions: int,
     ):
+        """
+        Generate an objective examination from a document.
 
-        result = self.documents.process(source)
+        The document is processed through the centralized
+        DocumentProcessor so the existing DocumentAnalysis
+        is reused by the exam engine.
+        """
 
-        paper = self.objective.generate(
-            analysis=result["analysis"],
-            material=result["extraction"].text,
+        if questions <= 0:
+            raise ValueError(
+                "questions must be greater than zero."
+            )
+
+        if duration <= 0:
+            raise ValueError(
+                "duration must be greater than zero."
+            )
+
+        processed = await self.documents.process_file(
+            source
+        )
+
+        paper = await self.objective.generate(
+            analysis=processed.analysis,
+            material=processed.cleaned_text,
             total_questions=questions,
         )
 
@@ -35,71 +76,36 @@ class ExamService:
 
         return paper
 
-    def create_theory_exam(
+    async def create_theory_exam(
         self,
-        source: str,
+        source: str | Path,
         duration: int,
         answer_any: int,
     ):
+        """
+        Generate a theory examination from a document.
 
-        result = self.documents.process(source)
+        The same processed document analysis is reused by
+        the theory examination engine.
+        """
 
-        return self.theory.generate(
-            analysis=result["analysis"],
-            material=result["extraction"].text,
-            duration=duration,
-            answer_any=answer_any,
-        )
-EOFcat > app/ai/services/exam.py << 'EOF'
-from __future__ import annotations
+        if answer_any <= 0:
+            raise ValueError(
+                "answer_any must be greater than zero."
+            )
 
-from app.ai.services.document_extractor import DocumentExtractorService
+        if duration <= 0:
+            raise ValueError(
+                "duration must be greater than zero."
+            )
 
-from app.ai.exam_engine.objective_generator import ObjectiveExamGenerator
-from app.ai.exam_engine.service import TheoryExamGenerator
-
-
-class ExamService:
-
-    def __init__(self):
-
-        self.documents = DocumentExtractorService()
-
-        self.theory = TheoryExamGenerator()
-
-        self.objective = ObjectiveExamGenerator()
-
-    def create_objective_exam(
-        self,
-        source: str,
-        duration: int,
-        questions: int,
-    ):
-
-        result = self.documents.process(source)
-
-        paper = self.objective.generate(
-            analysis=result["analysis"],
-            material=result["extraction"].text,
-            total_questions=questions,
+        processed = await self.documents.process_file(
+            source
         )
 
-        paper.duration_minutes = duration
-
-        return paper
-
-    def create_theory_exam(
-        self,
-        source: str,
-        duration: int,
-        answer_any: int,
-    ):
-
-        result = self.documents.process(source)
-
-        return self.theory.generate(
-            analysis=result["analysis"],
-            material=result["extraction"].text,
+        return await self.theory.generate(
+            analysis=processed.analysis,
+            material=processed.cleaned_text,
             duration=duration,
             answer_any=answer_any,
         )

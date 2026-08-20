@@ -11,6 +11,7 @@ from app.ai.base import (
     AIProviderUnavailableError,
 )
 from app.ai.factory import AIProviderFactory
+from app.ai.formatters import formatter
 
 logger = logging.getLogger(__name__)
 
@@ -158,7 +159,8 @@ class AIClient:
 
         # ---------- First Attempt ----------
         try:
-            return json.loads(cleaned)
+            payload = json.loads(cleaned)
+            return formatter.format_payload(payload)
 
         except Exception:
             logger.warning(
@@ -206,7 +208,8 @@ class AIClient:
         # ---------- Second Attempt ----------
 
         try:
-            return json.loads(repaired)
+            payload = json.loads(repaired)
+            return formatter.format_payload(payload)
 
         except Exception as exc:
 
