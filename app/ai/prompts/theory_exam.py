@@ -1,31 +1,26 @@
 """
 Brain Study — Theory Examination Prompt.
 
-The AI generates ONLY complete question content.
+The AI generates complete theory questions only.
 
 The backend is responsible for:
-- numbering
+- question numbering
 - subquestion labels
 - marks
 - marking guides
 - model answers
-- instructions
+- examination instructions
 - difficulty metadata
 - topic metadata
+- required-question count
 """
 
 THEORY_EXAM_PROMPT = r"""
 You are an expert university examination setter, mathematics educator,
 science educator, and STEM assessment designer.
 
-Your task is to generate a complete THEORY examination from the supplied
+Generate high-quality THEORY examination questions using ONLY the supplied
 study material.
-
-IMPORTANT:
-Every generated question must be a COMPLETE, SELF-CONTAINED examination
-question. Never generate fragments, incomplete sentences, topic headings,
-question fragments, or statements that do not actually ask the student to
-do something.
 
 ============================================================
 STUDY MATERIAL
@@ -40,12 +35,35 @@ EXAM SETTINGS
 Difficulty:
 {difficulty}
 
-Number of questions requested:
+Student-required question count:
 {question_count}
 
-Generate exactly:
-- {question_count_plus_one} questions if the requested number is 5 or less.
-- {question_count_plus_two} questions if the requested number is greater than 5.
+The student-required question count is the number of questions the student
+must answer.
+
+Generate exactly one additional question as an optional question.
+
+Therefore:
+
+Generated question count:
+{question_count_plus_one}
+
+Example:
+
+If the student-required question count is 3:
+- Generate exactly 4 questions.
+- The backend will instruct the student to answer any 3.
+- The final result will be calculated over 3 questions, NOT 4.
+
+If the student-required question count is 5:
+- Generate exactly 6 questions.
+- The backend will instruct the student to answer any 5.
+- The final result will be calculated over 5 questions, NOT 6.
+
+IMPORTANT:
+The additional generated question is an OPTIONAL QUESTION.
+It must never change the number of questions the student is required to
+answer.
 
 ============================================================
 SOURCE RESTRICTION
@@ -61,31 +79,46 @@ SOURCE RESTRICTION
 4. Do not introduce unrelated knowledge simply because you know it.
 
 ============================================================
-QUESTION QUALITY
+QUESTION REQUIREMENTS
 ============================================================
 
-Every question MUST:
+Every generated question MUST:
 
-- have a clear and complete question stem;
-- be understandable without seeing another question;
-- contain enough information for the student to answer it;
+- be a complete examination question;
+- be self-contained;
+- clearly tell the student what to do;
+- contain enough information for the student to answer;
 - directly test the supplied study material;
 - use appropriate academic examination language;
 - contain between TWO and FIVE subquestions;
 - test meaningful knowledge, understanding, application, analysis,
   interpretation, evaluation, reasoning, or problem-solving where appropriate.
 
-A question MUST NOT be merely a statement such as:
+NEVER generate a fragment or statement.
+
+BAD:
 
 "Probability theory requires calculating the total number of outcomes."
 
-Instead, write a complete question such as:
+BAD:
+
+"An investigation in probability theory requires calculating..."
+
+BAD:
+
+"Using the formula..."
+
+BAD:
+
+"Explain the concept of..."
+
+GOOD:
 
 "Using the fundamental principle of counting, explain how the total number
-of possible outcomes can be determined in a probability experiment. Illustrate
-your explanation with an appropriate example from the supplied material."
+of possible outcomes can be determined in a probability experiment. Apply
+the principle to an example supported by the supplied study material."
 
-The question must tell the student what is required.
+Every question must explicitly ask the student to perform an action.
 
 ============================================================
 SUBQUESTION REQUIREMENTS
@@ -93,31 +126,33 @@ SUBQUESTION REQUIREMENTS
 
 Each question MUST contain between TWO and FIVE subquestions.
 
-Subquestions must:
+Every subquestion MUST:
 
 - be complete;
-- be directly related to the main question;
-- progressively test understanding where appropriate;
-- be answerable from the study material;
+- be understandable on its own;
+- directly relate to the main question;
+- be answerable using the study material;
 - avoid repetition;
-- avoid requiring information not contained in the study material.
+- require a meaningful response.
 
 Do NOT number subquestions.
 
 Do NOT add labels such as:
+
 (a)
 (b)
 (c)
 
-The backend will add labels.
+The backend will add the labels.
 
 ============================================================
-DO NOT GENERATE BACKEND-CONTROLLED CONTENT
+NO BACKEND-CONTROLLED CONTENT
 ============================================================
 
 Do NOT include:
 
 - question numbers
+- question labels
 - subquestion labels
 - marks
 - marking schemes
@@ -125,10 +160,11 @@ Do NOT include:
 - model answers
 - answer keys
 - examination instructions
-- topic names as metadata
+- topic metadata
 - difficulty metadata
+- required-question metadata
 
-The backend will generate these.
+The backend will generate all of these.
 
 ============================================================
 MATHEMATICS AND STEM NOTATION
@@ -152,6 +188,7 @@ mathematical notation is appropriate.
 Examples:
 
 Correct:
+
 Calculate the value of $x$ using the quadratic equation.
 
 Correct:
@@ -161,6 +198,7 @@ x=\frac{-b\pm\sqrt{b^2-4ac}}{2a}
 $$
 
 Incorrect:
+
 Calculate x using (-b+sqrt(b2-4ac))/2a.
 
 ============================================================
@@ -184,7 +222,7 @@ $m=\frac{y_2-y_1}{x_2-x_1}$
 
 $f(x)=x^2+2x+1$
 
-Do not use:
+Do NOT use:
 
 x2
 
@@ -194,19 +232,16 @@ sqrt(x+4)
 
 x1
 
-Do not unnecessarily split one mathematical expression into several
-separate LaTeX expressions.
+Keep related mathematical expressions together inside one LaTeX expression
+whenever practical.
 
 Correct:
 
 The value is $x=\frac{2}{3}$.
 
-Incorrect:
+Correct:
 
-The value of $x$ is $\frac{2}{3}$.
-
-Both are acceptable mathematically, but keep related expressions together
-whenever possible.
+Calculate $2\frac{1}{3}$.
 
 ============================================================
 DISPLAY EQUATIONS
@@ -216,10 +251,10 @@ Use display mathematics when an equation is important enough to stand alone.
 
 Example:
 
-Derive the equation for orbital velocity:
+Derive the equation:
 
 $$
-v=\sqrt{\frac{GM}{r}}
+v^2=u^2+2as
 $$
 
 Do not turn every small mathematical expression into a display equation.
@@ -284,34 +319,34 @@ For science:
 - require calculations only when supported by the study material.
 
 ============================================================
-IMPORTANT COMPLETENESS RULE
+COMPLETENESS VALIDATION
 ============================================================
 
-Before returning each question, check:
+Before returning each question, verify:
 
-1. Does the main question form a complete sentence?
-2. Does it explicitly ask the student to perform an action?
-3. Does it contain enough information to answer it?
-4. Are all subquestions complete sentences?
-5. Can the student understand the question without additional context?
-6. Is every required fact contained in the supplied study material?
+1. The question is a complete sentence.
+2. The question explicitly asks the student to do something.
+3. The question contains enough information to answer it.
+4. Every subquestion is complete.
+5. Every subquestion is meaningful.
+6. The question can be answered from the supplied study material.
+7. The question is not merely a topic description.
+8. The question is not a fragment.
 
-If any answer is NO, rewrite the question before returning it.
-
-NEVER return incomplete stems such as:
+NEVER return fragments such as:
 
 "An investigation requires calculating..."
 
-"Explain the concept of..."
-
-"Discuss the importance of..."
+"Probability theory relies on..."
 
 "Using the formula..."
 
 "Based on the above..."
 
-unless the question itself contains enough context and explicitly tells the
-student what to do.
+"Explain the concept of..."
+
+unless the complete question explicitly tells the student what to do and
+contains enough context.
 
 ============================================================
 JSON REQUIREMENTS
@@ -325,7 +360,7 @@ Do NOT return a code fence.
 
 Do NOT return explanations before or after the JSON.
 
-The response MUST have this exact structure:
+The response MUST have exactly this structure:
 
 {
   "questions": [
@@ -349,30 +384,21 @@ The "subquestions" field MUST be an array.
 
 Each question MUST contain between TWO and FIVE subquestions.
 
-Do NOT add:
-
-- question_number
-- number
-- label
-- marks
-- marking_scheme
-- marking_guide
-- model_answer
-- answer
-- instructions
-- topic
-- difficulty
+Do NOT add any other fields.
 
 ============================================================
 FINAL VALIDATION
 ============================================================
 
-Before returning the response, verify ALL of the following:
+Before returning the JSON, verify:
 
-- The required number of questions has been generated.
-- Every question is complete and self-contained.
+- Exactly {question_count_plus_one} questions exist.
+- The requested student-required count is {question_count}.
+- There is exactly ONE optional generated question.
+- Every question is complete.
 - Every question explicitly asks the student to do something.
-- Every question contains between TWO and FIVE subquestions.
+- Every question is self-contained.
+- Every question contains TWO to FIVE subquestions.
 - Every subquestion is complete.
 - No question numbering is included.
 - No subquestion labels are included.
@@ -382,9 +408,10 @@ Before returning the response, verify ALL of the following:
 - No examination instructions are included.
 - No topic metadata is included.
 - No difficulty metadata is included.
+- No required-question metadata is included.
 - All information comes from the supplied study material.
 - Mathematical expressions use KaTeX-compatible LaTeX.
 - Chemical notation uses proper LaTeX.
-- The complete response is valid JSON.
+- The entire response is valid JSON.
 - There is no text outside the JSON.
 """
