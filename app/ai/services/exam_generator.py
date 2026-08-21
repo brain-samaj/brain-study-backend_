@@ -61,15 +61,37 @@ class ExamGenerator:
             else THEORY_EXAM_PROMPT
         )
 
-        # Theory exams require one additional optional question.
-        # Objective exams generate exactly the requested number.
-        question_count_plus_one = number_of_questions + 1
+        # --------------------------------------------------
+        # Render prompt safely.
+        #
+        # DO NOT use str.format() here.
+        #
+        # The examination prompts contain LaTeX such as:
+        #
+        #   \frac{{2}}{{3}}
+        #   \sqrt{{x+4}}
+        #   \begin{{bmatrix}}
+        #
+        # str.format() interprets those braces as formatting
+        # fields and causes:
+        #
+        # ValueError: unexpected '{' in field name
+        #
+        # We therefore replace only our known placeholders.
+        # --------------------------------------------------
 
-        rendered_prompt = prompt.format(
-            study_content=study_content,
-            question_count=number_of_questions,
-            question_count_plus_one=question_count_plus_one,
-            difficulty=difficulty,
+        rendered_prompt = prompt.replace(
+            "{study_content}",
+            study_content,
+        ).replace(
+            "{question_count_plus_one}",
+            str(number_of_questions + 1),
+        ).replace(
+            "{question_count}",
+            str(number_of_questions),
+        ).replace(
+            "{difficulty}",
+            difficulty,
         )
 
         # --------------------------------------------------
@@ -82,6 +104,10 @@ class ExamGenerator:
 
         # --------------------------------------------------
         # Centralized formatting pipeline
+        #
+        # This is intentionally done BEFORE normalization
+        # so mathematical/scientific notation is preserved
+        # throughout the final exam payload.
         # --------------------------------------------------
 
         payload = self._formatter.format_payload(payload)
@@ -264,9 +290,7 @@ class ExamGenerator:
                 "e",
             ]
 
-            fixed_subquestions: list[
-                dict[str, str]
-            ] = []
+            fixed_subquestions: list[dict[str, str]] = []
 
             for i, sub in enumerate(
                 subquestions[:5]
@@ -301,6 +325,7 @@ class ExamGenerator:
                     )
 
             # Guarantee at least two subquestions.
+
             while len(fixed_subquestions) < 2:
 
                 fixed_subquestions.append(
@@ -308,7 +333,9 @@ class ExamGenerator:
                         "label": labels[
                             len(fixed_subquestions)
                         ],
-                        "question": "Explain your answer.",
+                        "question": (
+                            "Explain your answer."
+                        ),
                     }
                 )
 
@@ -329,9 +356,7 @@ class ExamGenerator:
             ):
                 marking_scheme = []
 
-            fixed_scheme: list[
-                dict[str, Any]
-            ] = []
+            fixed_scheme: list[dict[str, Any]] = []
 
             for item in marking_scheme:
 
@@ -344,7 +369,6 @@ class ExamGenerator:
                                 2,
                             )
                         )
-
                     except (
                         TypeError,
                         ValueError,
@@ -418,9 +442,13 @@ class ExamGenerator:
                 )
 
             if question.get("options") is not None:
-                self._validate_objective(question)
+                self._validate_objective(
+                    question
+                )
             else:
-                self._validate_theory(question)
+                self._validate_theory(
+                    question
+                )
 
     # ============================================================
     # OBJECTIVE VALIDATION
@@ -445,6 +473,7 @@ class ExamGenerator:
         for field in required:
 
             if field not in question:
+
                 raise ExamGenerationError(
                     f"Objective question missing '{field}'."
                 )
@@ -458,6 +487,7 @@ class ExamGenerator:
             )
 
         if len(question["options"]) != 4:
+
             raise ExamGenerationError(
                 "Objective questions must contain exactly four options."
             )
@@ -468,6 +498,7 @@ class ExamGenerator:
             "C",
             "D",
         }:
+
             raise ExamGenerationError(
                 "Objective correct_answer must be A, B, C, or D."
             )
@@ -496,6 +527,7 @@ class ExamGenerator:
         for field in required:
 
             if field not in question:
+
                 raise ExamGenerationError(
                     f"Theory question missing '{field}'."
                 )
@@ -508,7 +540,10 @@ class ExamGenerator:
                 "'subquestions' must be a list."
             )
 
-        if len(question["subquestions"]) < 2:
+        if len(
+            question["subquestions"]
+        ) < 2:
+
             raise ExamGenerationError(
                 "Theory questions require at least two subquestions."
             )
@@ -530,6 +565,7 @@ class ExamGenerator:
             )
 
         if question["marks"] <= 0:
+
             raise ExamGenerationError(
                 "'marks' must be greater than zero."
             )
